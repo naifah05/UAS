@@ -30,65 +30,80 @@ cp "$TEMPLATE_DIR/php/Dockerfile" "$PHP_DIR/"
 cp "$TEMPLATE_DIR/php/www.conf" "$PHP_DIR/"
 cp "$TEMPLATE_DIR/php/local.ini" "$PHP_DIR/"
 
-# === Ensure mkcert SSL certs exist or generate them ===
+# === Check for Chocolatey and install if needed ===
+echo "🔍 Checking for Chocolatey..."
+if ! powershell.exe -Command "Get-Command choco" &> /dev/null; then
+  echo "❌ Chocolatey is not installed."
+  read -p "📦 Do you want to install Chocolatey? (y/n): " install_choco
+  if [[ "$install_choco" == [Yy] ]]; then
+    echo "🚀 Installing Chocolatey..."
+    powershell.exe -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; \
+      [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+      iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
+    sleep 10
+  else
+    echo "❌ Cannot continue without Chocolatey. Please install manually: https://chocolatey.org/install"
+    exit 1
+  fi
+fi
+
+# === Check for mkcert and install if needed ===
+echo "🔍 Checking for mkcert..."
+if ! powershell.exe -Command "Get-Command mkcert" &> /dev/null; then
+  echo "❌ mkcert not found."
+  read -p "📦 Do you want to install mkcert using Chocolatey? (y/n): " install_mkcert
+  if [[ "$install_mkcert" == [Yy] ]]; then
+    powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-Command \"choco install mkcert -y\"'"
+    echo "⏳ Waiting for mkcert installation to complete..."
+    sleep 10
+  else
+    echo "❌ mkcert is required. Install manually: https://github.com/FiloSottile/mkcert"
+    exit 1
+  fi
+fi
+
+# === Trust mkcert local CA if not already trusted ===
+echo "🔐 Running 'mkcert -install' to trust local CA..."
+powershell.exe -Command "mkcert -install"
+sleep 2
+
+# === Generate cert if not exist ===
 CERT_SOURCE_CRT="./${PROJECT_NAME}.pem"
 CERT_SOURCE_KEY="./${PROJECT_NAME}-key.pem"
 CERT_DEST_CRT="$NGINX_SSL/${DOMAIN}.crt"
 CERT_DEST_KEY="$NGINX_SSL/${DOMAIN}.key"
 
 if [[ ! -f "$CERT_SOURCE_CRT" || ! -f "$CERT_SOURCE_KEY" ]]; then
-  echo "🛠️ SSL certificates (.pem) not found. Attempting to generate with mkcert via PowerShell..."
+  echo "🔐 Generating SSL cert with mkcert for $DOMAIN..."
   powershell.exe -Command "mkcert -cert-file ${PROJECT_NAME}.pem -key-file ${PROJECT_NAME}-key.pem ${DOMAIN}"
-
   sleep 2
-
-  if [[ ! -f "$CERT_SOURCE_CRT" || ! -f "$CERT_SOURCE_KEY" ]]; then
-    echo "❌ Failed to generate SSL certificates using mkcert."
-    echo "👉 Please install mkcert on Windows and trust the root CA."
-    echo "👉 Or manually run: mkcert -cert-file ${PROJECT_NAME}.pem -key-file ${PROJECT_NAME}-key.pem ${DOMAIN}"
-    exit 1
-  fi
 fi
 
 # === Copy certs to nginx/ssl ===
-echo "🔐 Copying mkcert .pem files into nginx/ssl/ as .crt and .key..."
+echo "📄 Copying certs to $NGINX_SSL..."
 cp "$CERT_SOURCE_CRT" "$CERT_DEST_CRT"
 cp "$CERT_SOURCE_KEY" "$CERT_DEST_KEY"
-echo "✅ SSL files copied to $NGINX_SSL"
 
-# === Remove cert.pem and key.pem if they exist in the root directory ===
-echo "🔐 Copying mkcert .pem files into nginx/ssl/ as .crt and .key..."
-if [[ -f "$CERT_SOURCE_CRT" ]]; then
-  echo "🗑️ Removing $CERT_SOURCE_CRT from root directory..."
-  rm -f "$CERT_SOURCE_CRT"
-fi
-if [[ -f "$CERT_SOURCE_KEY" ]]; then
-  echo "🗑️ Removing $CERT_SOURCE_KEY from root directory..."
-  rm -f "$CERT_SOURCE_KEY"
-fi
-echo "✅ SSL files Removed from root directory."
+# === Clean up root certs ===
+rm -f "$CERT_SOURCE_CRT" "$CERT_SOURCE_KEY"
 
-# === Render docker-entrypoint.sh ===
+# === Generate docker-entrypoint.sh ===
 ENTRYPOINT_TEMPLATE="$TEMPLATE_DIR/php/docker-entrypoint.sh.template"
 ENTRYPOINT_TARGET="$PHP_DIR/docker-entrypoint.sh"
-echo "📝 Generating docker-entrypoint.sh with project name '$PROJECT_NAME'..."
 sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
     -e "s|{{DOMAIN}}|$DOMAIN|g" \
     "$ENTRYPOINT_TEMPLATE" > "$ENTRYPOINT_TARGET"
 chmod +x "$ENTRYPOINT_TARGET"
 
-# === Render nginx/default.conf from template ===
+# === Render nginx/default.conf ===
 DEFAULT_TEMPLATE="$TEMPLATE_DIR/nginx/default.conf.template"
 DEFAULT_OUTPUT="$NGINX_DIR/default.conf"
-echo "📝 Generating nginx/default.conf from template..."
 sed -e "s|{{DOMAIN}}|$DOMAIN|g" \
     -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
     "$DEFAULT_TEMPLATE" > "$DEFAULT_OUTPUT"
 
-# === Create .env for Docker Compose ===
-COMPOSE_ENV_FILE="$ROOT_DIR/.env"
-echo "📝 Generating Compose .env at $COMPOSE_ENV_FILE..."
-cat <<EOF > "$COMPOSE_ENV_FILE"
+# === Create Compose .env ===
+cat <<EOF > "$ROOT_DIR/.env"
 COMPOSE_PROJECT_NAME=${PROJECT_NAME}
 REPOSITORY_NAME=${PROJECT_NAME}
 IMAGE_TAG=latest
@@ -98,19 +113,14 @@ APP_URL="https://${DOMAIN}"
 ASSET_URL="https://${DOMAIN}"
 EOF
 
-# === Create .gitignore for Database ===
-GITIGNORE_FILE="$ROOT_DIR/.gitignore"
-echo "📝 Generating ,gitignore at $GITIGNORE_FILE..."
-cat <<EOF > "$GITIGNORE_FILE"
+# === Create .gitignore ===
+cat <<EOF > "$ROOT_DIR/.gitignore"
 db/data/*
 */db/data/*
 ../db/data/*
-#src/.env
-#*/src/.env
 EOF
 
 # === Create docker-compose.yml ===
-echo "📝 Creating docker-compose.yml..."
 cat <<EOF > "$ROOT_DIR/docker-compose.yml"
 services:
   php:
@@ -153,7 +163,7 @@ EOF
 
 echo "✅ docker-compose.yml created."
 
-# === Add dcm alias to shell config ===
+# === Add dcm alias ===
 ALIAS_CMD="alias dcm='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art'"
 ZSHRC_FILE="/root/.zshrc"
 
@@ -161,28 +171,85 @@ if ! grep -q "alias dcm=" "$ZSHRC_FILE"; then
   echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
   echo "✅ Added 'dcm' alias to $ZSHRC_FILE"
 else
-  echo "ℹ️ 'dcm' alias already exists in $ZSHRC_FILE"
   sed -i '/alias dcm=/d' "$ZSHRC_FILE"
   echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
-echo "✅ 'dcm' alias has been updated in $ZSHRC_FILE"
+  echo "✅ Updated 'dcm' alias in $ZSHRC_FILE"
 fi
 
-# === Update WSL /etc/hosts ===
+# === Add dcd alias ===
+ZSHRC_FILE="/root/.zshrc"
+
+# Escape the alias command for insertion
+ALIAS_CMD=$(cat <<'EOF'
+alias dcd='
+  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
+  if [ -n "$PROJECT" ]; then
+    echo "🔻 Stopping containers for $PROJECT..."
+    docker compose -p "$PROJECT" down
+  else
+    echo "❌ Could not detect project name."
+  fi
+'
+EOF
+)
+
+if ! grep -q "alias dcd=" "$ZSHRC_FILE"; then
+  echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
+  echo "✅ Added 'dcd' alias to $ZSHRC_FILE"
+else
+  sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
+  echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
+  echo "✅ Updated 'dcd' alias in $ZSHRC_FILE"
+fi
+
+# === Update Linux /etc/hosts ===
 if ! grep -q "$DOMAIN" /etc/hosts; then
   echo "$HOST_ENTRY" | sudo tee -a /etc/hosts > /dev/null
   echo "✅ Added $DOMAIN to WSL /etc/hosts"
 fi
 
-# === Add to Windows hosts file ===
+# === Update Windows hosts file safely ===
+WIN_HOSTS_SCRIPT_WIN_PATH="C:\\Windows\\Temp\\add_hosts_entry.ps1"
+WIN_HOSTS_SCRIPT_UNIX_PATH="/mnt/c/Windows/Temp/add_hosts_entry.ps1"
+
+cat <<EOF > "$WIN_HOSTS_SCRIPT_UNIX_PATH"
+\$HostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
+\$Entry = "$HOST_ENTRY"
+\$wasReadOnly = \$false
+
+# Remove read-only attribute if set
+if ((Get-Item \$HostsPath).Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+    Write-Host "🔓 Removing read-only attribute from hosts file..."
+    attrib -R \$HostsPath
+    \$wasReadOnly = \$true
+}
+
+# Append entry if not already present
+if ((Get-Content \$HostsPath) -notcontains \$Entry) {
+    Write-Host "➕ Adding host entry..."
+    Add-Content -Path \$HostsPath -Value \$Entry
+    Write-Host "✅ Host entry added."
+} else {
+    Write-Host "ℹ️ Host entry already exists."
+}
+
+# Restore read-only attribute
+if (\$wasReadOnly) {
+    Write-Host "🔒 Restoring read-only attribute..."
+    attrib +R \$HostsPath
+    Write-Host "✅ Read-only attribute restored."
+}
+EOF
+
 echo "🪟 Attempting to add $DOMAIN to Windows hosts file..."
-powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-Command \"Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value \\\"$HOST_ENTRY\\\"\"'" \
-  && echo "✅ Added $DOMAIN to Windows hosts file" \
-  || echo "⚠️ Please run PowerShell as Administrator and manually add: $HOST_ENTRY"
+powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File $WIN_HOSTS_SCRIPT_WIN_PATH'" \
+  && echo "✅ Windows hosts file updated." \
+  || echo "⚠️ Please manually add: $HOST_ENTRY"
+
 
 # === Done ===
-echo "✅ Project folder '$PROJECT_NAME' is ready."
-echo "📦 Navigate to '$PROJECT_NAME' and run: docker-compose up --build"
-read -p "🚀 Do you want to start the project now? (y/n): " start_now
-if [[ $start_now == [Yy] ]]; then
-  cd "$ROOT_DIR" && docker-compose up -d --build
+echo "✅ Project '$PROJECT_NAME' is ready at https://${DOMAIN}"
+read -p "🚀 Start project now with Docker Compose? (y/n): " start_now
+if [[ "$start_now" == [Yy] ]]; then
+  cd "$ROOT_DIR" && docker-compose up -d --build -y
 fi
