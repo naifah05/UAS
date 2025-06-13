@@ -2,7 +2,7 @@
 
 PROJECT_NAME="$1"
 if [ -z "$PROJECT_NAME" ]; then
-  echo "❌ Please provide a project name: ./script.sh myproject"
+  echo "❌ Please provide a project name: ./start.sh myproject"
   exit 1
 fi
 
