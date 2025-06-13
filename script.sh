@@ -56,6 +56,18 @@ cp "$CERT_SOURCE_CRT" "$CERT_DEST_CRT"
 cp "$CERT_SOURCE_KEY" "$CERT_DEST_KEY"
 echo "✅ SSL files copied to $NGINX_SSL"
 
+# === Remove cert.pem and key.pem if they exist in the root directory ===
+echo "🔐 Copying mkcert .pem files into nginx/ssl/ as .crt and .key..."
+if [[ -f "$CERT_SOURCE_CRT" ]]; then
+  echo "🗑️ Removing $CERT_SOURCE_CRT from root directory..."
+  rm -f "$CERT_SOURCE_CRT"
+fi
+if [[ -f "$CERT_SOURCE_KEY" ]]; then
+  echo "🗑️ Removing $CERT_SOURCE_KEY from root directory..."
+  rm -f "$CERT_SOURCE_KEY"
+fi
+echo "✅ SSL files Removed from root directory."
+
 # === Render docker-entrypoint.sh ===
 ENTRYPOINT_TEMPLATE="$TEMPLATE_DIR/php/docker-entrypoint.sh.template"
 ENTRYPOINT_TARGET="$PHP_DIR/docker-entrypoint.sh"
@@ -140,6 +152,20 @@ services:
 EOF
 
 echo "✅ docker-compose.yml created."
+
+# === Add dcm alias to shell config ===
+ALIAS_CMD="alias dcm='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art'"
+ZSHRC_FILE="/root/.zshrc"
+
+if ! grep -q "alias dcm=" "$ZSHRC_FILE"; then
+  echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
+  echo "✅ Added 'dcm' alias to $ZSHRC_FILE"
+else
+  echo "ℹ️ 'dcm' alias already exists in $ZSHRC_FILE"
+  sed -i '/alias dcm=/d' "$ZSHRC_FILE"
+  echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
+echo "✅ 'dcm' alias has been updated in $ZSHRC_FILE"
+fi
 
 # === Update WSL /etc/hosts ===
 if ! grep -q "$DOMAIN" /etc/hosts; then
