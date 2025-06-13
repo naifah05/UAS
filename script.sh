@@ -29,47 +29,6 @@ cp "$TEMPLATE_DIR/php/Dockerfile" "$PHP_DIR/"
 cp "$TEMPLATE_DIR/php/www.conf" "$PHP_DIR/"
 cp "$TEMPLATE_DIR/php/local.ini" "$PHP_DIR/"
 
-# === Chocolatey Check/Install ===
-echo "🔍 Checking for Chocolatey..."
-if ! powershell.exe -Command "Get-Command choco" &>/dev/null; then
-  echo "❌ Chocolatey not found. Installing..."
-  powershell.exe -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))"
-
-  echo "✅ Chocolatey installed."
-
-  # Generate Windows .bat script to restart WSL and resume this script
-  WINDOWS_SCRIPT="/mnt/c/Windows/Temp/restart_wsl_${PROJECT_NAME}.bat"
-  cat <<EOF > "$WINDOWS_SCRIPT"
-@echo off
-timeout /t 5 >nul
-wsl -d Ubuntu -- bash -c "cd /root/perkuliahan && ./script.sh $PROJECT_NAME"
-EOF
-
-  # Launch it from Windows side (non-blocking)
-  powershell.exe -Command "Start-Process -WindowStyle Hidden -FilePath 'C:\\Windows\\Temp\\restart_wsl_${PROJECT_NAME}.bat'"
-
-  # Shutdown WSL to refresh environment
-  echo "🔁 Restarting WSL to apply PATH changes..."
-  powershell.exe -Command "wsl --shutdown"
-  exit 0
-fi
-echo "✅ Chocolatey is already installed."
-# === Install mkcert ===
-if ! powershell.exe -Command "Get-Command mkcert" &>/dev/null; then
-  echo "🔍 Installing mkcert..."
-  choco install -y mkcert
-  echo "✅ mkcert installed."
-else
-  echo "✅ mkcert is already installed."
-fi
-# === Install mkcert CA ===
-if ! powershell.exe -Command "mkcert -CAROOT" &>/dev/null; then
-  echo "🔍 Installing mkcert CA..."
-  powershell.exe -Command "mkcert -install"
-  echo "✅ mkcert CA installed."
-else
-  echo "✅ mkcert CA is already installed."
-fi
 # === Generate certificates ===
 CERT_SOURCE_CRT="./${PROJECT_NAME}.pem"
 CERT_SOURCE_KEY="./${PROJECT_NAME}-key.pem"
