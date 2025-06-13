@@ -8,7 +8,7 @@ if [ -z "$PROJECT_NAME" ]; then
 fi
 
 # === Setup Paths ===
-ROOT_DIR="./$PROJECT_NAME"
+ROOT_DIR="/root/perkuliahan/$PROJECT_NAME"
 TEMPLATE_DIR="./template"
 DB_DIR="$ROOT_DIR/db/conf.d"
 NGINX_DIR="$ROOT_DIR/nginx"
@@ -17,6 +17,7 @@ PHP_DIR="$ROOT_DIR/php"
 SRC_DIR="$ROOT_DIR/src"
 DOMAIN="${PROJECT_NAME}.test"
 ENV_FILE="$ROOT_DIR/.env"
+GITIGNORE_FILE="$ROOT_DIR/.gitignore"
 HOST_ENTRY="127.0.0.1 $DOMAIN"
 
 echo "📁 Creating folder structure for '$PROJECT_NAME'..."
@@ -85,6 +86,17 @@ APP_URL="https://${DOMAIN}"
 ASSET_URL="https://${DOMAIN}"
 EOF
 
+# === Create .gitignore for Database ===
+GITIGNORE_FILE="$ROOT_DIR/.gitignore"
+echo "📝 Generating ,gitignore at $GITIGNORE_FILE..."
+cat <<EOF > "$GITIGNORE_FILE"
+db/data/*
+*/db/data/*
+../db/data/*
+#src/.env
+#*/src/.env
+EOF
+
 # === Create docker-compose.yml ===
 echo "📝 Creating docker-compose.yml..."
 cat <<EOF > "$ROOT_DIR/docker-compose.yml"
@@ -124,6 +136,7 @@ services:
       MYSQL_ROOT_PASSWORD: p455w0rd
     volumes:
       - ./db/conf.d:/etc/mysql/conf.d
+      - ./db/data:/var/lib/mysql
 EOF
 
 echo "✅ docker-compose.yml created."

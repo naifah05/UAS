@@ -20,7 +20,7 @@ services:
       - "13306:3306"
     volumes:
       - ./db/data:/var/lib/mysql
-      - ./db/conf.d:/etc/mysql/conf.d:ro
+      - ./db/my.cnf:/etc/mysql/conf.d:ro
     environment:
       MYSQL_USER: djambred
       MYSQL_PASSWORD: p455w0rd1!.
