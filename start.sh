@@ -122,10 +122,25 @@ echo "✅ docker-compose.yml created."
 # === Aliases ===
 ZSHRC_FILE="/root/.zshrc"
 
+# Add dcu
+grep -q "alias dcu=" "$ZSHRC_FILE" && sed -i '/alias dcu=/d' "$ZSHRC_FILE"
+echo "alias dcu='docker compose up -d'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dcu' added to $ZSHRC_FILE"
+
+# Add dci
+grep -q "alias dci=" "$ZSHRC_FILE" && sed -i '/alias dci=/d' "$ZSHRC_FILE"
+echo "alias dci='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan project:init'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dci' added to $ZSHRC_FILE"
+
 # Add dcm
 grep -q "alias dcm=" "$ZSHRC_FILE" && sed -i '/alias dcm=/d' "$ZSHRC_FILE"
-echo "alias dcm='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art'" >> "$ZSHRC_FILE"
+echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:model \"\$1\" -ms; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcm' added to $ZSHRC_FILE"
+
+# Add dcv
+grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
+echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
 
 # Add dcd
 grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"

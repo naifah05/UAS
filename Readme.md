@@ -56,4 +56,9 @@ $newPath = ($envPath -split ";") -ne "C:\ProgramData\chocolatey\bin" -join ";"
 ```php
 source /root/.zshrc
 ```
-
+2. AKAN ADA TAMBAHAN PERINTAH SEPERTI
+- dcu (untuk docker-compose up -d)
+- dcd (untuk docker-compose down)
+- dcm (untuk create model -ms)
+- dci (untuk project init dimana sudah termasuk migrate, seed, fresh)
+- dcv (untuk create filament resource --generate)
