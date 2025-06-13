@@ -29,6 +29,7 @@ cp "$TEMPLATE_DIR/nginx/Dockerfile" "$NGINX_DIR/"
 cp "$TEMPLATE_DIR/php/Dockerfile" "$PHP_DIR/"
 cp "$TEMPLATE_DIR/php/www.conf" "$PHP_DIR/"
 cp "$TEMPLATE_DIR/php/local.ini" "$PHP_DIR/"
+cp -a "$TEMPLATE_DIR/src/." "$SRC_DIR/"
 
 # === Generate certificates ===
 CERT_SOURCE_CRT="./${PROJECT_NAME}.pem"
@@ -142,6 +143,11 @@ grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
 echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
 
+# Add dcl
+grep -q "alias dcl=" "$ZSHRC_FILE" && sed -i '/alias dcl=/d' "$ZSHRC_FILE"
+echo "alias dcl='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:filament-layout \"\$1\"; }; f'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dcl' added to $ZSHRC_FILE"
+
 # Add dcd
 grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
 cat <<'EOF' >> "$ZSHRC_FILE"
@@ -200,7 +206,7 @@ fi
 # === GitHub Repo Creation ===
 echo "🌐 Creating GitHub repository via API..."
 
-REPO_NAME="$PROJECT_NAME-$(date +%s)"
+REPO_NAME="${PROJECT_NAME}-$(date +%Y%m%d%H%M%S)"
 API_URL="https://api.github.com/user/repos"
 
 # === Load GitHub User ===
@@ -266,3 +272,7 @@ if [ -n "$GITHUB_SSH" ]; then
   git remote add origin "$GITHUB_SSH"
   git push -u origin main && echo "✅ Project pushed to GitHub." || echo "❌ Failed to push to GitHub."
 fi
+
+# === Open VS Code ===
+echo "🧠 Opening project in VS Code..."
+code .
