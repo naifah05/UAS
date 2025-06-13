@@ -141,6 +141,10 @@ alias dcd='
 EOF
 echo "✅ Alias 'dcd' added to $ZSHRC_FILE"
 
+# === Source .zshrc ===
+source "$ZSHRC_FILE"
+echo "✅ Alias 'dcd and dcm' added to $ZSHRC_FILE"
+
 # === WSL /etc/hosts ===
 if ! grep -q "$DOMAIN" /etc/hosts; then
   echo "$HOST_ENTRY" | sudo tee -a /etc/hosts > /dev/null
