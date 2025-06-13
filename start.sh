@@ -7,6 +7,7 @@ if [ -z "$PROJECT_NAME" ]; then
 fi
 
 # === Setup Paths ===
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="/root/perkuliahan/$PROJECT_NAME"
 TEMPLATE_DIR="./template"
 DB_DIR="$ROOT_DIR/db/conf.d"
@@ -178,4 +179,75 @@ echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
 read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
 if [[ "$start_now" =~ ^[Yy]$ ]]; then
   cd "$ROOT_DIR" && docker-compose up -d --build
+fi
+
+
+# === GitHub Repo Creation ===
+echo "🌐 Creating GitHub repository via API..."
+
+REPO_NAME="$PROJECT_NAME-$(date +%s)"
+API_URL="https://api.github.com/user/repos"
+
+# === Load GitHub User ===
+if [ -f "$SCRIPT_DIR/.github-user" ]; then
+  GITHUB_USER=$(<"$SCRIPT_DIR/.github-user")
+else
+  echo "❌ GitHub user file not found at $SCRIPT_DIR/.github-user"
+  exit 1
+fi
+
+# === Load GitHub Token ===
+if [ -f "$SCRIPT_DIR/.github-token" ]; then
+  GITHUB_TOKEN=$(<"$SCRIPT_DIR/.github-token")
+else
+  echo "❌ GitHub token file not found at $SCRIPT_DIR/.github-token"
+  exit 1
+fi
+
+
+REPO_PAYLOAD=$(cat <<EOF
+{
+  "name": "$REPO_NAME",
+  "private": false
+}
+EOF
+)
+
+# Call API and capture both body and status
+RESPONSE=$(curl -s -w "\n%{http_code}" -u "$GITHUB_USER:$GITHUB_TOKEN" \
+  -X POST "$API_URL" \
+  -H "Accept: application/vnd.github+json" \
+  -d "$REPO_PAYLOAD")
+
+BODY=$(echo "$RESPONSE" | head -n -1)
+STATUS=$(echo "$RESPONSE" | tail -n1)
+
+if [ "$STATUS" = "201" ]; then
+  echo "✅ GitHub repository '$REPO_NAME' created successfully."
+  GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+elif [ "$STATUS" = "422" ]; then
+  echo "❌ Repository already exists or invalid request."
+  if command -v jq >/dev/null; then
+    echo "📦 GitHub says: $(echo "$BODY" | jq -r '.errors[0].message')"
+  else
+    echo "📦 GitHub says: $BODY"
+  fi
+  GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+else
+  echo "❌ Failed to create GitHub repository. HTTP Status: $STATUS"
+  echo "🔐 Check your GitHub username/token or if the repo already exists."
+  echo "📦 GitHub response: $BODY"
+  GITHUB_SSH=""
+fi
+
+# === Git Init and Push ===
+if [ -n "$GITHUB_SSH" ]; then
+  echo "🔧 Initializing Git repository..."
+  cd "$ROOT_DIR"
+  git init
+  git add .
+  git commit -m "🔥 fresh from the oven"
+  git branch -M main
+  git remote add origin "$GITHUB_SSH"
+  git push -u origin main && echo "✅ Project pushed to GitHub." || echo "❌ Failed to push to GitHub."
 fi
