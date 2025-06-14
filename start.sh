@@ -218,7 +218,12 @@ grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
 echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
 
-
+# === Prompt to start project ===
+echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
+read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
+if [[ "$start_now" =~ ^[Yy]$ ]]; then
+  cd "$ROOT_DIR" && docker-compose up -d --build
+fi
 
 # === WSL /etc/hosts ===
 if ! grep -q "$DOMAIN" /etc/hosts; then
@@ -251,13 +256,6 @@ echo "🪟 Updating Windows hosts file..."
 powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File C:\\Windows\\Temp\\add_hosts_entry.ps1'" \
   && echo "✅ Windows hosts file updated." \
   || echo "⚠️ Please manually add: $HOST_ENTRY"
-
-# === Prompt to start project ===
-echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
-read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
-if [[ "$start_now" =~ ^[Yy]$ ]]; then
-  cd "$ROOT_DIR" && docker-compose up -d --build
-fi
 
 
 # === GitHub Repo Creation ===
@@ -333,3 +331,8 @@ fi
 # === Open VS Code ===
 echo "🧠 Opening project in VS Code..."
 code .
+
+# === Final message ===
+source "$ZSHRC_FILE"
+echo "🔄 Reloading .zshrc to apply new aliases..."
+echo "🎉 Project '$PROJECT_NAME' setup complete!"
