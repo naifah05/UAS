@@ -313,16 +313,25 @@ dcp() {
   echo "✅ Changes pushed to origin/main."
 }
 
+# ADDED START ALIAS
+ALIAS_NAME="start"
+ALIAS_CMD="alias $ALIAS_NAME='bash \"$SCRIPT_DIR/start.sh\" $PROJECT_NAME'"
+ZSHRC_FILE="/root/.zshrc"
+
+# Delete existing alias line if present, then append new alias
+sed -i "/^alias $ALIAS_NAME=/d" "$ZSHRC_FILE"
+echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
+echo "✅ Alias '$ALIAS_NAME' added/replaced in $ZSHRC_FILE"
+
+# Reload zsh config if running inside zsh
+if [ -n "$ZSH_VERSION" ]; then
+  echo "🔄 Sourcing $ZSHRC_FILE..."
+  source "$ZSHRC_FILE"
+else
+  echo "⚠️ Not in Zsh shell; alias will apply on next zsh start."
+fi
+
 # === Open VS Code ===
 echo "🧠 Opening project in VS Code..."
 code .
-
-# === Final Step: Apply aliases if inside Zsh ===
-if [ -n "$ZSH_VERSION" ]; then
-  echo "🔄 Sourcing .zshrc inside Zsh..."
-  source /root/.zshrc
-else
-  echo "⚠️ Not in Zsh. Starting Zsh and sourcing .zshrc..."
-  exec zsh -c "source /root/.zshrc && zsh"
-fi
 echo "🎉 Setup complete! Your project '$PROJECT_NAME' is ready to go! $ROOT_DIR"
