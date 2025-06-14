@@ -124,6 +124,11 @@ echo "✅ docker-compose.yml created."
 ZSHRC_FILE="/root/.zshrc"
 
 # Add dcr
+# Remove old dcr definition if it exists
+sed -i '/^dcr()/,/^}/d' "$ZSHRC_FILE"
+# Add new dcr function
+cat <<'EOF' >> "$ZSHRC_FILE"
+
 dcr() {
   local NAME="$1"
   if [ -z "$NAME" ]; then
@@ -139,7 +144,7 @@ dcr() {
     return 1
   fi
 
-  # Build filename patterns
+  # Convert CamelCase to snake_case
   local NAME_SNAKE=$(echo "$NAME" | sed -r 's/([a-z])([A-Z])/\1_\L\2/g' | tr '[:upper:]' '[:lower:]')
   local NAME_PLURAL="${NAME_SNAKE}s"
 
@@ -152,6 +157,46 @@ dcr() {
 
   echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
 }
+EOF
+
+echo "✅ Function 'dcr' added to $ZSHRC_FILE"
+
+# Add dcp
+sed -i '/^dcp()/,/^}/d' "$ZSHRC_FILE"
+
+# Append new dcp function
+cat <<'EOF' >> "$ZSHRC_FILE"
+# === Git Commit & Push ===
+dcp() {
+  if [ $# -eq 0 ]; then
+    echo "❌ Usage: dcp your commit message"
+    return 1
+  fi
+
+  local msg="$@"
+  echo "📦 Committing: \"$msg\"..."
+  git add .
+  git commit -m "$msg"
+  git push -u origin main
+  echo "✅ Changes pushed to origin/main."
+}
+EOF
+echo "✅ Function 'dcp' added to $ZSHRC_FILE"
+
+# Add dcd
+grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
+cat <<'EOF' >> "$ZSHRC_FILE"
+alias dcd='
+  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
+  if [ -n "$PROJECT" ]; then
+    echo "🔻 Stopping containers for $PROJECT..."
+    docker compose -p "$PROJECT" down
+  else
+    echo "❌ Could not detect project name."
+  fi
+'
+EOF
+echo "✅ Alias 'dcd' added to $ZSHRC_FILE"
 
 # Add dcu
 grep -q "alias dcu=" "$ZSHRC_FILE" && sed -i '/alias dcu=/d' "$ZSHRC_FILE"
@@ -173,20 +218,7 @@ grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
 echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
 
-# Add dcd
-grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
-cat <<'EOF' >> "$ZSHRC_FILE"
-alias dcd='
-  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
-  if [ -n "$PROJECT" ]; then
-    echo "🔻 Stopping containers for $PROJECT..."
-    docker compose -p "$PROJECT" down
-  else
-    echo "❌ Could not detect project name."
-  fi
-'
-EOF
-echo "✅ Alias 'dcd' added to $ZSHRC_FILE"
+
 
 # === WSL /etc/hosts ===
 if ! grep -q "$DOMAIN" /etc/hosts; then
