@@ -59,9 +59,13 @@ $newPath = ($envPath -split ";") -ne "C:\ProgramData\chocolatey\bin" -join ";"
 ```
 
 ## UNTUK MEMULAI SILAHKAN LAKUKAN PERINTAH BERIKUT INI 
+### EKSEKUSI PERINTAH SETUP
+```php
+./setup.sh
+```
 ### MISALNYA NAMA PROJECT NYA ADALAH PEMWEB 
 ```php
-./start pemweb
+start pemweb
 ```
 ## SETUP TERAKHIR DIDALAM TERMINAL WSL
 1. SETELAH SELESAI SEMUA BISA LAKUKAN SOURCE ULANG ZSHRC ATAU BISA COPY PASTE CMD DIBAWAH INI
