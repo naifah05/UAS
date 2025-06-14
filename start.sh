@@ -120,104 +120,6 @@ EOF
 
 echo "✅ docker-compose.yml created."
 
-# === Aliases ===
-ZSHRC_FILE="/root/.zshrc"
-
-# Add dcr
-# Remove old dcr definition if it exists
-sed -i '/^dcr()/,/^}/d' "$ZSHRC_FILE"
-# Add new dcr function
-cat <<'EOF' >> "$ZSHRC_FILE"
-
-dcr() {
-  local NAME="$1"
-  if [ -z "$NAME" ]; then
-    echo "❌ Usage: dcr <ModelName>"
-    return 1
-  fi
-
-  # Auto-detect the PHP container (customize grep if needed)
-  local CONTAINER=$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
-
-  if [ -z "$CONTAINER" ]; then
-    echo "❌ No PHP container found."
-    return 1
-  fi
-
-  # Convert CamelCase to snake_case
-  local NAME_SNAKE=$(echo "$NAME" | sed -r 's/([a-z])([A-Z])/\1_\L\2/g' | tr '[:upper:]' '[:lower:]')
-  local NAME_PLURAL="${NAME_SNAKE}s"
-
-  echo "🗑 Removing $NAME files in container: $CONTAINER"
-
-  docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
-  docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
-  docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
-  docker exec "$CONTAINER" bash -c \"find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete\"
-
-  echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
-}
-EOF
-
-echo "✅ Function 'dcr' added to $ZSHRC_FILE"
-
-# Add dcp
-sed -i '/^dcp()/,/^}/d' "$ZSHRC_FILE"
-
-# Append new dcp function
-cat <<'EOF' >> "$ZSHRC_FILE"
-# === Git Commit & Push ===
-dcp() {
-  if [ $# -eq 0 ]; then
-    echo "❌ Usage: dcp your commit message"
-    return 1
-  fi
-
-  local msg="$@"
-  echo "📦 Committing: \"$msg\"..."
-  git add .
-  git commit -m "$msg"
-  git push -u origin main
-  echo "✅ Changes pushed to origin/main."
-}
-EOF
-echo "✅ Function 'dcp' added to $ZSHRC_FILE"
-
-# Add dcd
-grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
-cat <<'EOF' >> "$ZSHRC_FILE"
-alias dcd='
-  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
-  if [ -n "$PROJECT" ]; then
-    echo "🔻 Stopping containers for $PROJECT..."
-    docker compose -p "$PROJECT" down
-  else
-    echo "❌ Could not detect project name."
-  fi
-'
-EOF
-echo "✅ Alias 'dcd' added to $ZSHRC_FILE"
-
-# Add dcu
-grep -q "alias dcu=" "$ZSHRC_FILE" && sed -i '/alias dcu=/d' "$ZSHRC_FILE"
-echo "alias dcu='docker compose up -d'" >> "$ZSHRC_FILE"
-echo "✅ Alias 'dcu' added to $ZSHRC_FILE"
-
-# Add dci
-grep -q "alias dci=" "$ZSHRC_FILE" && sed -i '/alias dci=/d' "$ZSHRC_FILE"
-echo "alias dci='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art project:init'" >> "$ZSHRC_FILE"
-echo "✅ Alias 'dci' added to $ZSHRC_FILE"
-
-# Add dcm
-grep -q "alias dcm=" "$ZSHRC_FILE" && sed -i '/alias dcm=/d' "$ZSHRC_FILE"
-echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:model \"\$1\" -msc; }; f'" >> "$ZSHRC_FILE"
-echo "✅ Alias 'dcm' added to $ZSHRC_FILE"
-
-# Add dcv
-grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
-echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
-echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
-
 # === Prompt to start project ===
 echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
 read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
@@ -256,7 +158,6 @@ echo "🪟 Updating Windows hosts file..."
 powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File C:\\Windows\\Temp\\add_hosts_entry.ps1'" \
   && echo "✅ Windows hosts file updated." \
   || echo "⚠️ Please manually add: $HOST_ENTRY"
-
 
 # === GitHub Repo Creation ===
 echo "🌐 Creating GitHub repository via API..."
@@ -328,11 +229,100 @@ if [ -n "$GITHUB_SSH" ]; then
   git push -u origin main && echo "✅ Project pushed to GitHub." || echo "❌ Failed to push to GitHub."
 fi
 
+# === Aliases ===
+ZSHRC_FILE="/root/.zshrc"
+
+# Add dcr
+grep -q "alias dcr=" "$ZSHRC_FILE" && sed -i '/alias dcr=/d' "$ZSHRC_FILE"
+alias dcr = 'dcr() {
+  local NAME="$1"
+  if [ -z "$NAME" ]; then
+    echo "❌ Usage: dcr <ModelName>"
+    return 1
+  fi
+
+  # Auto-detect the PHP container (customize grep if needed)
+  local CONTAINER=$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
+
+  if [ -z "$CONTAINER" ]; then
+    echo "❌ No PHP container found."
+    return 1
+  fi
+
+  # Build filename patterns
+  local NAME_SNAKE=$(echo "$NAME" | sed -r 's/([a-z])([A-Z])/\1_\L\2/g' | tr '[:upper:]' '[:lower:]')
+  local NAME_PLURAL="${NAME_SNAKE}s"
+
+  echo "🗑 Removing $NAME files in container: $CONTAINER"
+
+  docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
+  docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
+  docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
+  docker exec "$CONTAINER" bash -c \"find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete\"
+
+  echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
+}'
+
+# Add dcu
+grep -q "alias dcu=" "$ZSHRC_FILE" && sed -i '/alias dcu=/d' "$ZSHRC_FILE"
+echo "alias dcu='docker compose up -d'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dcu' added to $ZSHRC_FILE"
+
+# Add dci
+grep -q "alias dci=" "$ZSHRC_FILE" && sed -i '/alias dci=/d' "$ZSHRC_FILE"
+echo "alias dci='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art project:init'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dci' added to $ZSHRC_FILE"
+
+# Add dcm
+grep -q "alias dcm=" "$ZSHRC_FILE" && sed -i '/alias dcm=/d' "$ZSHRC_FILE"
+echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:model \"\$1\" -msc; }; f'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dcm' added to $ZSHRC_FILE"
+
+# Add dcv
+grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
+echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
+echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
+
+# Add dcd
+grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
+cat <<'EOF' >> "$ZSHRC_FILE"
+alias dcd='
+  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
+  if [ -n "$PROJECT" ]; then
+    echo "🔻 Stopping containers for $PROJECT..."
+    docker compose -p "$PROJECT" down
+  else
+    echo "❌ Could not detect project name."
+  fi
+'
+EOF
+echo "✅ Alias 'dcd' added to $ZSHRC_FILE"
+
+# Add dcp
+dcp() {
+  if [ $# -eq 0 ]; then
+    echo "❌ Usage: dcp your commit message"
+    return 1
+  fi
+
+  local msg="$@"
+  echo "📦 Committing: \"$msg\"..."
+  git add .
+  git commit -m "$msg"
+  git push -u origin main
+  echo "✅ Changes pushed to origin/main."
+}
+
 # === Open VS Code ===
 echo "🧠 Opening project in VS Code..."
 code .
 
-# === Final message ===
-source "$ZSHRC_FILE"
-echo "🔄 Reloading .zshrc to apply new aliases..."
-echo "🎉 Project '$PROJECT_NAME' setup complete!"
+# === Final Step: Apply aliases if inside Zsh ===
+if [ -n "$ZSH_VERSION" ]; then
+  echo "🔄 Sourcing .zshrc inside Zsh..."
+  source /root/.zshrc
+else
+  echo "⚠️ Not in Zsh. Starting Zsh and sourcing .zshrc..."
+  exec zsh -c "source /root/.zshrc && zsh"
+fi
+echo "🎉 Setup complete! Your project '$PROJECT_NAME' is ready to go! $ROOT_DIR"
