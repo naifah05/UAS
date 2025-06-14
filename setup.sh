@@ -29,7 +29,7 @@ dcr() {
     return 1
   fi
 
-  local CONTAINER=$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
+  local CONTAINER=\$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
   if [ -z "$CONTAINER" ]; then
     echo "❌ No PHP container found."
     return 1
@@ -47,7 +47,6 @@ dcr() {
 
   echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
 }
-
 
 dcm() {
   if [ -z "\$1" ]; then
