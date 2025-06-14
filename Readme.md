@@ -65,7 +65,7 @@ $newPath = ($envPath -split ";") -ne "C:\ProgramData\chocolatey\bin" -join ";"
 ```
 2. KEDUA
 ```php
-./start pemweb
+./start.sh pemweb
 ```
 ## SETUP TERAKHIR DIDALAM TERMINAL WSL
 1. SETELAH SELESAI SEMUA BISA LAKUKAN SOURCE ULANG ZSHRC ATAU BISA COPY PASTE CMD DIBAWAH INI
