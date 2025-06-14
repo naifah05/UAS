@@ -208,14 +208,6 @@ alias dci='docker exec -it $(docker ps --filter "name=_php" --format "{{.Names}}
 # === END ===
 EOF
 
-# === Reload ZSH if inside ZSH ===
-if [ -n "$ZSH_VERSION" ]; then
-  echo "🔄 Reloading $ZSHRC_FILE..."
-  source "$ZSHRC_FILE"
-else
-  echo "⚠️ Not in Zsh — open a new terminal or run: exec zsh"
-fi
-
 # === Prompt to Start ===
 echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
 read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
@@ -309,6 +301,16 @@ fi
 # === Launch VS Code ===
 echo "🧠 Opening in VS Code..."
 code .
+
+# === Reload ZSH if inside ZSH ===
+if [ "${ZSH_VERSION:-}" ]; then
+  echo "🔄 Reloading $ZSHRC_FILE..."
+  source "$ZSHRC_FILE"
+else
+  echo "🔁 Switching to Zsh..."
+  exec zsh
+fi
+
 echo "🎉 All done! Project '$PROJECT_NAME' is ready at $ROOT_DIR"
 # === End of Script ===
 echo "🚀 You can now start developing your project!"
