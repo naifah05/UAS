@@ -1,8 +1,6 @@
 #!/bin/bash
-set -euo pipefail
-
+# === Update Zsh Config ===
 ZSHRC_FILE="/root/.zshrc"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 touch "$ZSHRC_FILE"
 
@@ -20,36 +18,47 @@ start() {
     echo "❌ Usage: start <project-name>"
     return 1
   fi
-  bash "$SCRIPT_DIR/start.sh" "\$1"
+  bash '"$SCRIPT_DIR"'/start.sh "\$1"
 }
 
 dcr() {
-  local NAME="\$1"
-  if [ -z "\$NAME" ]; then
+  local NAME="$1"
+  if [ -z "$NAME" ]; then
     echo "❌ Usage: dcr <ModelName>"
     return 1
   fi
-  local CONTAINER=\$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
-  if [ -z "\$CONTAINER" ]; then
+
+  local CONTAINER=$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
+  if [ -z "$CONTAINER" ]; then
     echo "❌ No PHP container found."
     return 1
   fi
-  local NAME_SNAKE=\$(echo "\$NAME" | sed -E 's/([a-z])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
-  local NAME_PLURAL="\${NAME_SNAKE}s"
-  echo "🗑 Removing \$NAME files in container: \$CONTAINER"
-  docker exec "\$CONTAINER" bash -c "rm -f app/Models/\$NAME.php"
-  docker exec "\$CONTAINER" bash -c "rm -f app/Http/Controllers/\${NAME}Controller.php"
-  docker exec "\$CONTAINER" bash -c "rm -f database/seeders/\${NAME}Seeder.php"
-  docker exec "\$CONTAINER" bash -c "find database/migrations -type f -name '*create_\${NAME_PLURAL}_table*.php' -delete"
-  echo "✅ Done removing: \$NAME"
+
+  local NAME_SNAKE=$(echo "$NAME" | sed -E 's/([a-z])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
+  local NAME_PLURAL="${NAME_SNAKE}s"
+
+  echo "🗑 Removing $NAME files in container: $CONTAINER"
+
+  docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
+  docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
+  docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
+  docker exec "$CONTAINER" bash -c "find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete"
+
+  echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
 }
+
 
 dcm() {
   if [ -z "\$1" ]; then
     echo "❌ Usage: dcm <ModelName>"
     return 1
   fi
-  docker exec -it \$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art make:model "\$1" -msc
+  local CONTAINER=\$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
+  if [ -z "\$CONTAINER" ]; then
+    echo "❌ PHP container not found."
+    return 1
+  fi
+  docker exec -it "\$CONTAINER" art make:model "\$1" -msc
 }
 
 dcv() {
@@ -57,7 +66,12 @@ dcv() {
     echo "❌ Usage: dcv <ModelName>"
     return 1
   fi
-  docker exec -it \$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art make:filament-resource "\$1" --generate
+  local CONTAINER=\$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
+  if [ -z "\$CONTAINER" ]; then
+    echo "❌ PHP container not found."
+    return 1
+  fi
+  docker exec -it "\$CONTAINER" art make:filament-resource "\$1" --generate
 }
 
 dcp() {
@@ -90,15 +104,11 @@ alias dci='docker exec -it \$(docker ps --filter "name=_php" --format "{{.Names}
 # === END ===
 EOF
 
-# === Reload Zsh Config ===
+# === Reload Zsh Config Only If Running Zsh ===
 if [ -n "${ZSH_VERSION:-}" ]; then
-  echo "🔄 Sourcing $ZSHRC_FILE in Zsh shell..."
+  echo "🔄 You're already in Zsh. Sourcing $ZSHRC_FILE..."
   source "$ZSHRC_FILE"
 else
-  if command -v zsh >/dev/null 2>&1; then
-    echo "🔁 Not in Zsh. Starting Zsh to apply changes..."
-    exec zsh
-  else
-    echo "⚠️ Zsh is not installed. Please install Zsh or restart your terminal manually."
-  fi
+  echo "✅ Aliases written to $ZSHRC_FILE."
+  echo "🔁 Open a new Zsh terminal or run: exec zsh"
 fi
