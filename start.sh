@@ -120,6 +120,21 @@ EOF
 
 echo "✅ docker-compose.yml created."
 
+# === Cleaning up first ===
+CLEANUP_FLAG="$SCRIPT_DIR/.docker_cleanup_done"
+if [ ! -f "$CLEANUP_FLAG" ]; then
+  echo "🧹 Running initial docker-cleanup.sh..."
+  zsh "$SCRIPT_DIR/docker-cleanup.sh"
+  if [ $? -eq 0 ]; then
+    touch "$CLEANUP_FLAG"
+    echo "✅ docker-cleanup.sh completed and flagged."
+  else
+    echo "⚠️ docker-cleanup.sh failed."
+  fi
+else
+  echo "ℹ️ docker-cleanup.sh already run before, skipping."
+fi
+
 # === Prompt to start project ===
 echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
 read -p "🚀 Start project with Docker Compose now? (y/n): " start_now

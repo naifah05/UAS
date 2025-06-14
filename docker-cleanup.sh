@@ -1,7 +1,8 @@
 #!/bin/bash
 
 echo "⚠️  This script will REMOVE all Docker containers, images, volumes, and networks."
-read -p "Are you sure you want to continue? (y/N): " confirm
+echo -n "Are you sure you want to continue? (y/N): "
+read confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
   echo "❌ Aborted."
   exit 1
@@ -23,4 +24,3 @@ echo "🧼 Running Docker system prune (just in case)..."
 docker system prune -a --volumes -f
 
 echo "✅ Docker environment fully cleaned."
-echo "You can now start fresh with your Docker setup."

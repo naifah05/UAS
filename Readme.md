@@ -59,13 +59,9 @@ $newPath = ($envPath -split ";") -ne "C:\ProgramData\chocolatey\bin" -join ";"
 ```
 
 ## UNTUK MEMULAI SILAHKAN LAKUKAN PERINTAH BERIKUT INI 
-1. PERTAMA
+### MISALNYA NAMA PROJECT NYA ADALAH PEMWEB 
 ```php
-./docker-cleanup.sh
-```
-2. KEDUA
-```php
-./start.sh pemweb
+start pemweb
 ```
 ## SETUP TERAKHIR DIDALAM TERMINAL WSL
 1. SETELAH SELESAI SEMUA BISA LAKUKAN SOURCE ULANG ZSHRC ATAU BISA COPY PASTE CMD DIBAWAH INI
@@ -79,3 +75,4 @@ source /root/.zshrc
 - dci (untuk project init dimana sudah termasuk migrate, seed, fresh)
 - dcv (untuk create filament resource --generate)
 - dcr (untuk remove model,cont,seeder,migration)
+- dcp (untuk git push)
