@@ -369,8 +369,8 @@ EOF
 # === Main Execution ===
 if [ "$1" == "start" ]; then
   start_project "$2"
-elif [ "$1" == "update-zsh" ]; then
+elif [ "$1" == "alias" ]; then
   update_zsh_config
 else
-  echo "❌ Invalid command. Use 'start <project-name>' or 'update-zsh'."
+  echo "❌ Invalid command. Use 'start <project-name>' or 'alias'."
 fi
