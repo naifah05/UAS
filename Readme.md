@@ -5,6 +5,11 @@
 ```php
 whoami
 ```
+2. INSTALL jq
+```php
+apt install jq -y
+```
+
 HASIL :
 ❯ whoami
 root

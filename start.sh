@@ -308,9 +308,9 @@ if [ "${ZSH_VERSION:-}" ]; then
   source "$ZSHRC_FILE"
 else
   echo "🔁 Switching to Zsh..."
+  echo "🎉 All done! Project '$PROJECT_NAME' is ready at $ROOT_DIR"
+  echo "🚀 You can now start developing your project!"
   exec zsh
 fi
 
-echo "🎉 All done! Project '$PROJECT_NAME' is ready at $ROOT_DIR"
 # === End of Script ===
-echo "🚀 You can now start developing your project!"
