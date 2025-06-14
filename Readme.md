@@ -49,6 +49,11 @@ $newPath = ($envPath -split ";") -ne "C:\ProgramData\chocolatey\bin" -join ";"
 ```
 
 ## UNTUK MEMULAI SILAHKAN LAKUKAN PERINTAH BERIKUT INI 
+1. PERTAMA
+```php
+./docker-cleanup.sh
+```
+2. KEDUA
 ```php
 ./start pemweb
 ```
