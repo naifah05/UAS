@@ -123,6 +123,36 @@ echo "✅ docker-compose.yml created."
 # === Aliases ===
 ZSHRC_FILE="/root/.zshrc"
 
+# Add dcr
+dcr() {
+  local NAME="$1"
+  if [ -z "$NAME" ]; then
+    echo "❌ Usage: dcr <ModelName>"
+    return 1
+  fi
+
+  # Auto-detect the PHP container (customize grep if needed)
+  local CONTAINER=$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
+
+  if [ -z "$CONTAINER" ]; then
+    echo "❌ No PHP container found."
+    return 1
+  fi
+
+  # Build filename patterns
+  local NAME_SNAKE=$(echo "$NAME" | sed -r 's/([a-z])([A-Z])/\1_\L\2/g' | tr '[:upper:]' '[:lower:]')
+  local NAME_PLURAL="${NAME_SNAKE}s"
+
+  echo "🗑 Removing $NAME files in container: $CONTAINER"
+
+  docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
+  docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
+  docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
+  docker exec "$CONTAINER" bash -c \"find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete\"
+
+  echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
+}
+
 # Add dcu
 grep -q "alias dcu=" "$ZSHRC_FILE" && sed -i '/alias dcu=/d' "$ZSHRC_FILE"
 echo "alias dcu='docker compose up -d'" >> "$ZSHRC_FILE"
@@ -135,7 +165,7 @@ echo "✅ Alias 'dci' added to $ZSHRC_FILE"
 
 # Add dcm
 grep -q "alias dcm=" "$ZSHRC_FILE" && sed -i '/alias dcm=/d' "$ZSHRC_FILE"
-echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:model \"\$1\" -ms; }; f'" >> "$ZSHRC_FILE"
+echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:model \"\$1\" -msc; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcm' added to $ZSHRC_FILE"
 
 # Add dcv

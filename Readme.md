@@ -32,6 +32,7 @@ choco install mkcert
 ```php
 mkcert -install
 ```
+4. RESTART LAPTOP KALIAN
 
 ### JIKA ERROR TIDAK BISA INSTALL COBA LANGKAH INI MASIH DILAKUKAN DENGAN POWERSHELL RUN AS ADMINISTRATOR
 #### SATU
@@ -59,6 +60,7 @@ source /root/.zshrc
 2. AKAN ADA TAMBAHAN PERINTAH SEPERTI
 - dcu (untuk docker-compose up -d)
 - dcd (untuk docker-compose down)
-- dcm (untuk create model -ms)
+- dcm (untuk create model -mfcs)
 - dci (untuk project init dimana sudah termasuk migrate, seed, fresh)
 - dcv (untuk create filament resource --generate)
+- dcr (untuk remove model,cont,seeder,migration)
