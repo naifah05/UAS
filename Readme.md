@@ -71,7 +71,7 @@ source /root/.zshrc
 2. AKAN ADA TAMBAHAN PERINTAH SEPERTI
 - dcu (untuk docker-compose up -d)
 - dcd (untuk docker-compose down)
-- dcm (untuk create model -mfcs)
+- dcm (untuk create model -mcs)
 - dci (untuk project init dimana sudah termasuk migrate, seed, fresh)
 - dcv (untuk create filament resource --generate)
 - dcr (untuk remove model,cont,seeder,migration)

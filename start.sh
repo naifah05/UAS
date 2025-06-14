@@ -231,8 +231,6 @@ else
   echo "📦 GitHub response: $BODY"
   GITHUB_SSH=""
 fi
-
-# === Git Init and Push ===
 if [ -n "$GITHUB_SSH" ]; then
   echo "🔧 Initializing Git repository..."
   cd "$ROOT_DIR"
@@ -246,26 +244,38 @@ fi
 
 # === Aliases ===
 ZSHRC_FILE="/root/.zshrc"
+# start 
+start() {
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [ -z "$1" ]; then
+    echo "❌ Usage: start <project-name>"
+    return 1
+  fi
 
-# Add dcr
-grep -q "alias dcr=" "$ZSHRC_FILE" && sed -i '/alias dcr=/d' "$ZSHRC_FILE"
-alias dcr = 'dcr() {
+  bash "$SCRIPT_DIR/start.sh" "$1"
+}
+
+{
+  sed -i '/^start()/,/^}/d' "$ZSHRC_FILE"
+  sed -i '/alias start=/d' "$ZSHRC_FILE"
+  declare -f start >> "$ZSHRC_FILE"
+  echo "alias start='start'" >> "$ZSHRC_FILE"
+} && echo "✅ Function and alias 'start' added to $ZSHRC_FILE"
+
+# Define the function
+dcr() {
   local NAME="$1"
   if [ -z "$NAME" ]; then
     echo "❌ Usage: dcr <ModelName>"
     return 1
   fi
-
-  # Auto-detect the PHP container (customize grep if needed)
   local CONTAINER=$(docker ps --format "{{.Names}}" | grep -Ei 'php|app' | head -n 1)
-
   if [ -z "$CONTAINER" ]; then
     echo "❌ No PHP container found."
     return 1
   fi
 
-  # Build filename patterns
-  local NAME_SNAKE=$(echo "$NAME" | sed -r 's/([a-z])([A-Z])/\1_\L\2/g' | tr '[:upper:]' '[:lower:]')
+  local NAME_SNAKE=$(echo "$NAME" | sed -E 's/([a-z])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
   local NAME_PLURAL="${NAME_SNAKE}s"
 
   echo "🗑 Removing $NAME files in container: $CONTAINER"
@@ -273,10 +283,19 @@ alias dcr = 'dcr() {
   docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
   docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
   docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
-  docker exec "$CONTAINER" bash -c \"find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete\"
+  docker exec "$CONTAINER" bash -c "find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete"
 
   echo "✅ Done removing model, controller, seeder, and migration for: $NAME"
-}'
+}
+
+# Save the function and alias in .zshrc
+{
+  sed -i '/^dcr()/,/^}/d' "$ZSHRC_FILE"
+  sed -i '/alias dcr=/d' "$ZSHRC_FILE"
+  declare -f dcr >> "$ZSHRC_FILE"
+  echo "alias dcr='dcr'" >> "$ZSHRC_FILE"
+} && echo "✅ Function and alias 'dcr' added to $ZSHRC_FILE"
+
 
 # Add dcu
 grep -q "alias dcu=" "$ZSHRC_FILE" && sed -i '/alias dcu=/d' "$ZSHRC_FILE"
@@ -328,22 +347,17 @@ dcp() {
   echo "✅ Changes pushed to origin/main."
 }
 
-# ADDED START ALIAS
-ALIAS_NAME="start"
-ALIAS_CMD="alias $ALIAS_NAME='bash \"$SCRIPT_DIR/start.sh\" $PROJECT_NAME'"
-ZSHRC_FILE="/root/.zshrc"
-
-# Delete existing alias line if present, then append new alias
-sed -i "/^alias $ALIAS_NAME=/d" "$ZSHRC_FILE"
-echo "$ALIAS_CMD" >> "$ZSHRC_FILE"
-echo "✅ Alias '$ALIAS_NAME' added/replaced in $ZSHRC_FILE"
-
-# Reload zsh config if running inside zsh
+# === Reload Zsh Config ===
 if [ -n "$ZSH_VERSION" ]; then
-  echo "🔄 Sourcing $ZSHRC_FILE..."
-  source "$ZSHRC_FILE"
+  echo "🔄 Sourcing ~/.zshrc in Zsh shell..."
+  source ~/.zshrc
 else
-  echo "⚠️ Not in Zsh shell; alias will apply on next zsh start."
+  if command -v zsh >/dev/null 2>&1; then
+    echo "🔁 Not in Zsh. Starting Zsh to apply aliases..."
+    exec zsh
+  else
+    echo "⚠️ Zsh is not installed. Please install Zsh or manually restart your terminal."
+  fi
 fi
 
 # === Open VS Code ===
