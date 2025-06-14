@@ -160,23 +160,18 @@ echo "✅ Alias 'dcu' added to $ZSHRC_FILE"
 
 # Add dci
 grep -q "alias dci=" "$ZSHRC_FILE" && sed -i '/alias dci=/d' "$ZSHRC_FILE"
-echo "alias dci='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan project:init'" >> "$ZSHRC_FILE"
+echo "alias dci='docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art project:init'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dci' added to $ZSHRC_FILE"
 
 # Add dcm
 grep -q "alias dcm=" "$ZSHRC_FILE" && sed -i '/alias dcm=/d' "$ZSHRC_FILE"
-echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:model \"\$1\" -msc; }; f'" >> "$ZSHRC_FILE"
+echo "alias dcm='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:model \"\$1\" -msc; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcm' added to $ZSHRC_FILE"
 
 # Add dcv
 grep -q "alias dcv=" "$ZSHRC_FILE" && sed -i '/alias dcv=/d' "$ZSHRC_FILE"
-echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
+echo "alias dcv='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) art make:filament-resource \"\$1\" --generate; }; f'" >> "$ZSHRC_FILE"
 echo "✅ Alias 'dcv' added to $ZSHRC_FILE"
-
-# Add dcl
-grep -q "alias dcl=" "$ZSHRC_FILE" && sed -i '/alias dcl=/d' "$ZSHRC_FILE"
-echo "alias dcl='f() { docker exec -it \$(docker ps --filter \"name=_php\" --format \"{{.Names}}\" | head -n 1) php artisan make:filament-layout \"\$1\"; }; f'" >> "$ZSHRC_FILE"
-echo "✅ Alias 'dcl' added to $ZSHRC_FILE"
 
 # Add dcd
 grep -q "alias dcd=" "$ZSHRC_FILE" && sed -i '/alias dcd=/,/^'\''$/d' "$ZSHRC_FILE"
