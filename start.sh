@@ -220,6 +220,8 @@ unalias dcu 2>/dev/null
 alias dcu='docker compose up -d'
 unalias dci 2>/dev/null
 alias dci='docker exec -it $(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art project:init'
+unalias dca 2>/dev/null
+alias dca='docker exec -it $(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art'
 # === END ===
 EOF
 
