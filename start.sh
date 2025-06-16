@@ -177,6 +177,21 @@ dcm() {
   docker exec -it "$CONTAINER" art make:filament-resource "$NAME" --generate
   echo "✅ $NAME scaffolded with Filament."
 }
+unalias dcv 2>/dev/null
+dcv() {
+  if [ -z "$1" ]; then
+    echo "❌ Usage: dcm <ModelName>"
+    return 1
+  fi
+  local CONTAINER=$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
+  if [ -z "$CONTAINER" ]; then
+    echo "❌ PHP container not found."
+    return 1
+  fi
+  local NAME="$1"
+  docker exec -it "$CONTAINER" art make:filament-resource "$NAME" --generate
+  echo "✅ $NAME resource with Filament."
+}
 unalias dcp 2>/dev/null
 dcp() {
   if [ $# -eq 0 ]; then

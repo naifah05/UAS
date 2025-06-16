@@ -75,10 +75,27 @@ $newPath = ($envPath -split ";") -ne "C:\ProgramData\chocolatey\bin" -join ";"
 source /root/.zshrc
 ```
 2. AKAN ADA TAMBAHAN PERINTAH SEPERTI
-- dcu (untuk docker-compose up -d)
-- dcd (untuk docker-compose down)
-- dcm (untuk create model -mcs)
-- dci (untuk project init dimana sudah termasuk migrate, seed, fresh)
-- dcv (untuk create filament resource --generate)
-- dcr (untuk remove model,cont,seeder,migration)
-- dcp (untuk git push)
+- dcu untuk docker-compose up -d
+```php
+dcu
+```
+- dcd untuk docker-compose down
+```php
+dcd
+```
+- dcm untuk create model, controller, seeder, migration, filament resource
+```php
+dcm Test
+```
+- dci untuk project init dimana sudah termasuk migrate, seed, fresh
+```php
+dci
+```
+- dcr untuk model, controller, seeder, migration, filament resource
+```php
+dcr Test
+```
+- dcp untuk git add, git commit dan git push
+```php
+dcp testing
+```
