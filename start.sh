@@ -231,6 +231,22 @@ dcd() {
     echo "❌ Could not detect project name."
   fi
 }
+unalias pip 2>/dev/null
+pip() {
+  if [[ "$1" == "install" ]]; then
+    command pip install --break-system-packages "${@:2}"
+  else
+    command pip "$@"
+  fi
+}
+unalias pip3 2>/dev/null
+pip3() {
+  if [[ "$1" == "install" ]]; then
+    command pip3 install --break-system-packages "${@:2}"
+  else
+    command pip3 "$@"
+  fi
+}
 unalias dcu 2>/dev/null
 alias dcu='docker compose up -d'
 unalias dci 2>/dev/null
