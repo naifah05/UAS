@@ -369,11 +369,6 @@ fi
 
 # === Launch VS Code ===
 echo "🧠 Opening in VS Code..."
-cd "$SRC_DIR"
-if ! command -v code &> /dev/null; then
-  echo "❌ VS Code not found. Please install it first."
-  exit 1
-fi  
 code .
 
 # === Reload ZSH if inside ZSH ===
