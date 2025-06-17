@@ -11,7 +11,7 @@ DOMAIN="${PROJECT_NAME}.test"
 ROOT_DIR="$HOME/perkuliahan/$PROJECT_NAME"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/template"
-
+ZSHRC_FILE="$HOME/.zshrc"
 DB_DIR="$ROOT_DIR/db/conf.d"
 NGINX_DIR="$ROOT_DIR/nginx"
 NGINX_SSL="$NGINX_DIR/ssl"
@@ -110,7 +110,6 @@ echo "🔤 Checking MesloLGS NF Nerd Font..."
 
 if ! fc-list | grep -qi "MesloLGS NF"; then
   echo "⬇️  Installing MesloLGS NF Nerd Font..."
-  brew tap homebrew/cask-fonts
   brew install --cask font-meslo-lg-nerd-font
 else
   echo "✅ MesloLGS NF Nerd Font already installed."
@@ -189,8 +188,6 @@ fi
 
 echo "✅ Zsh enhancements complete."
 echo "🧼 Restart terminal and run 'p10k configure' to customize your prompt."
-
-ZSHRC_FILE="$HOME/.zshrc"
 
 echo "🔗 Updating functions and aliases in $ZSHRC_FILE..."
 sed -i '' '/# === START ===/,/# === END ===/d' "$ZSHRC_FILE"
