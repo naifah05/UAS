@@ -85,6 +85,11 @@ services:
     build:
       context: ./php
     container_name: ${PROJECT_NAME}_php
+    healthcheck:
+      test: ["CMD", "php", "-v"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - ./src:/var/www/html
     environment:
@@ -96,6 +101,11 @@ services:
     build:
       context: ./nginx
     container_name: ${PROJECT_NAME}_nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "443:443"
       - "80:80"
@@ -109,6 +119,11 @@ services:
   db:
     image: mariadb:10.11
     container_name: ${PROJECT_NAME}_db
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "13306:3306"
     environment:
@@ -230,6 +245,27 @@ echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
 read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
 if [[ "$start_now" =~ ^[Yy]$ ]]; then
   cd "$ROOT_DIR" && docker-compose up -d --build
+
+  echo "⏳ Waiting for containers to become healthy..."
+
+  # Wait for all expected containers
+  containers=("php" "nginx" "db")
+  for service in "${containers[@]}"; do
+    container_name="${PROJECT_NAME}_${service}"
+
+    echo "🔍 Waiting for $container_name..."
+    while true; do
+      status=$(docker inspect -f '{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "starting")
+      if [[ "$status" == "healthy" || "$status" == "running" ]]; then
+        echo "✅ $container_name is $status."
+        break
+      else
+        sleep 1
+      fi
+    done
+  done
+
+  echo "🚀 All containers are up and healthy!"
 fi
 
 # === Update WSL /etc/hosts ===
