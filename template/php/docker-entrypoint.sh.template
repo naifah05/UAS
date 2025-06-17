@@ -23,8 +23,8 @@ APP_ENV=local
 APP_KEY=base64:jU6xg8sp9ia37ypFlTVk1CAFx6MmeXRukO1W987uUzI=
 APP_DEBUG=true
 APP_TIMEZONE='Asia/Jakarta'
-APP_URL="${DOMAIN}"
-ASSET_URL="${DOMAIN}"
+APP_URL="https://${PROJECT_NAME}.test"
+ASSET_URL="https://${PROJECT_NAME}.test"
 DEBUGBAR_ENABLED=false
 ASSET_PREFIX=
 # ASSET_PREFIX=/dev/kit/public example in case deployed inside a folder
@@ -99,8 +99,8 @@ APP_ENV=local
 APP_KEY=base64:jU6xg8sp9ia37ypFlTVk1CAFx6MmeXRukO1W987uUzI=
 APP_DEBUG=true
 APP_TIMEZONE='Asia/Jakarta'
-APP_URL="${DOMAIN}"
-ASSET_URL="${DOMAIN}"
+APP_URL="https://${PROJECT_NAME}.test"
+ASSET_URL="https://${PROJECT_NAME}.test"
 DEBUGBAR_ENABLED=false
 ASSET_PREFIX=
 # ASSET_PREFIX=/dev/kit/public example in case deployed inside a folder
