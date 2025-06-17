@@ -103,3 +103,8 @@ dcp testing
 ```php
 dca make:middleware Testing
 ```
+# UNTUK PENGGUNA MAC OS
+## BISA LANGSUNG EKSEKUSI
+```php
+./start_mac.sh
+```
