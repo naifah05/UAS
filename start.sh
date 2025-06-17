@@ -102,7 +102,7 @@ services:
       context: ./nginx
     container_name: ${PROJECT_NAME}_nginx
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD-SHELL", "curl -k -fsSL https://${DOMAIN} || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
