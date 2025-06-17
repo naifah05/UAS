@@ -99,3 +99,7 @@ dcr Test
 ```php
 dcp testing
 ```
+- dca untuk php artisan
+```php
+dca make:middleware Testing
+```
