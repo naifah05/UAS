@@ -84,6 +84,112 @@ else
   echo "✅ Oh My Zsh already installed."
 fi
 
+# === Powerlevel10k and Zsh Enhancements ===
+echo "🎨 Setting up Powerlevel10k and Zsh plugins..."
+
+# Install MesloLGS NF font (only if missing)
+FONT_DIR="$HOME/Library/Fonts"
+MESLO_URL="https://github.com/romkatv/powerlevel10k-media/raw/master"
+MESLO_FONT_INSTALLED=$(ls "$FONT_DIR" | grep -i "MesloLGS NF Regular.ttf" || true)
+
+if [ -z "$MESLO_FONT_INSTALLED" ]; then
+  echo "🔤 Installing MesloLGS NF fonts..."
+  for font in "MesloLGS NF Regular.ttf" "MesloLGS NF Bold.ttf" "MesloLGS NF Italic.ttf" "MesloLGS NF Bold Italic.ttf"; do
+    curl -fsSL "$MESLO_URL/$(echo $font | sed 's/ /%20/g')" -o "$FONT_DIR/$font"
+  done
+  echo "✅ MesloLGS NF fonts installed."
+else
+  echo "✅ MesloLGS NF fonts already installed."
+fi
+
+# === Powerlevel10k and Zsh Enhancements ===
+echo "🎨 Setting up Powerlevel10k and Zsh plugins..."
+
+# === Install MesloLGS NF Nerd Fonts (macOS Nerd Fonts tap) ===
+echo "🔤 Checking MesloLGS NF Nerd Font..."
+
+if ! fc-list | grep -qi "MesloLGS NF"; then
+  echo "⬇️  Installing MesloLGS NF Nerd Font..."
+  brew tap homebrew/cask-fonts
+  brew install --cask font-meslo-lg-nerd-font
+else
+  echo "✅ MesloLGS NF Nerd Font already installed."
+fi
+
+# Prompt to open Terminal font settings
+read -p "🎨 Do you want to open Terminal font settings to apply MesloLGS NF now? (y/n): " change_font
+
+if [[ "$change_font" =~ ^[Yy]$ ]]; then
+  osascript <<EOF
+  tell application "Terminal"
+    activate
+    delay 1
+    display dialog "Go to Terminal > Settings > Profile > Text and set font to 'MesloLGS NF Regular'."
+  end tell
+EOF
+fi
+
+# Optionally configure iTerm2
+if [ -d "/Applications/iTerm.app" ]; then
+  read -p "🎛 Do you use iTerm2 and want to open it now to set Meslo font? (y/n): " iterm_font
+
+  if [[ "$iterm_font" =~ ^[Yy]$ ]]; then
+    open -a iTerm
+    osascript <<EOF
+    tell application "iTerm"
+      activate
+      display dialog "In iTerm: Preferences > Profiles > Text > Change Font > 'MesloLGS NF Regular'"
+    end tell
+EOF
+  fi
+fi
+
+# Install Powerlevel10k if not already installed
+P10K_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
+if [ ! -d "$P10K_DIR" ]; then
+  echo "🌈 Installing Powerlevel10k..."
+  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"
+else
+  echo "✅ Powerlevel10k already installed."
+fi
+
+# Set ZSH_THEME in .zshrc (if not already set)
+if ! grep -q 'ZSH_THEME="powerlevel10k/powerlevel10k"' "$ZSHRC_FILE"; then
+  sed -i '' 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' "$ZSHRC_FILE"
+  echo "✅ Set ZSH_THEME to powerlevel10k."
+else
+  echo "✅ ZSH_THEME already set to powerlevel10k."
+fi
+
+# Install zsh-autosuggestions if missing
+AUTOSUGGEST_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
+if [ ! -d "$AUTOSUGGEST_DIR" ]; then
+  echo "💡 Installing zsh-autosuggestions..."
+  git clone https://github.com/zsh-users/zsh-autosuggestions "$AUTOSUGGEST_DIR"
+else
+  echo "✅ zsh-autosuggestions already installed."
+fi
+
+# Install zsh-syntax-highlighting if missing
+SYNTAX_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
+if [ ! -d "$SYNTAX_DIR" ]; then
+  echo "💡 Installing zsh-syntax-highlighting..."
+  git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$SYNTAX_DIR"
+else
+  echo "✅ zsh-syntax-highlighting already installed."
+fi
+
+# Add plugins if not already present
+if ! grep -q "zsh-autosuggestions" "$ZSHRC_FILE"; then
+  sed -i '' '/^plugins=/ s/)/ zsh-autosuggestions zsh-syntax-highlighting)/' "$ZSHRC_FILE"
+  echo "✅ Plugins zsh-autosuggestions and zsh-syntax-highlighting added."
+else
+  echo "✅ Zsh plugins already configured."
+fi
+
+echo "✅ Zsh enhancements complete."
+echo "🧼 Restart terminal and run 'p10k configure' to customize your prompt."
+
 ZSHRC_FILE="$HOME/.zshrc"
 
 echo "🔗 Updating functions and aliases in $ZSHRC_FILE..."
