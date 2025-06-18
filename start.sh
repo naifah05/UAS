@@ -86,9 +86,9 @@ services:
       context: ./php
     container_name: ${PROJECT_NAME}_php
     healthcheck:
-      test: ["CMD", "php", "-v"]
+      test: ["CMD-SHELL", "php artisan --version"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     volumes:
       - ./src:/var/www/html
@@ -105,7 +105,7 @@ services:
       test: ["CMD-SHELL", "curl -k -fsSL https://${DOMAIN} || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 30
     ports:
       - "443:443"
       - "80:80"
@@ -247,6 +247,24 @@ pip3() {
     command pip3 "$@"
   fi
 }
+unalias start 2>/dev/null
+alias start='cd /root/boilerplate && ./start.sh'
+unalias gc 2>/dev/null
+gclone() {
+  local user=$1
+  local repo=$2
+  local ssh_url="git@github.com:${user}/${repo}.git"
+  local https_url="https://github.com/${user}/${repo}.git"
+
+  echo "🛠️ Trying SSH clone: $ssh_url"
+  if git clone "$ssh_url"; then
+    echo "✅ Cloned via SSH"
+  else
+    echo "⚠️ SSH failed, falling back to HTTPS..."
+    git clone "$https_url" && echo "✅ Cloned via HTTPS"
+  fi
+}
+alias gc=gclone
 unalias dcu 2>/dev/null
 alias dcu='docker compose up -d'
 unalias dci 2>/dev/null
@@ -255,6 +273,32 @@ unalias dca 2>/dev/null
 alias dca='docker exec -it $(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art'
 # === END ===
 EOF
+
+# === Update WSL /etc/hosts ===
+if ! grep -q "$DOMAIN" /etc/hosts; then
+  echo "$HOST_ENTRY" | sudo tee -a /etc/hosts > /dev/null
+  echo "✅ Added $DOMAIN to WSL /etc/hosts"
+fi
+
+# === Patch Windows hosts file ===
+WIN_HOSTS_PWS="/mnt/c/Windows/Temp/add_hosts_entry.ps1"
+cat <<EOF > "$WIN_HOSTS_PWS"
+\$HostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
+\$Entry = "$HOST_ENTRY"
+\$wasReadOnly = \$false
+if ((Get-Item \$HostsPath).Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+    attrib -R \$HostsPath
+    \$wasReadOnly = \$true
+}
+if ((Get-Content \$HostsPath) -notcontains \$Entry) {
+    Add-Content -Path \$HostsPath -Value \$Entry
+}
+if (\$wasReadOnly) {
+    attrib +R \$HostsPath
+}
+EOF
+powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File C:\\Windows\\Temp\\add_hosts_entry.ps1'" \
+  && echo "✅ Windows hosts file updated." || echo "⚠️ Please manually add: $HOST_ENTRY"
 
 # === Prompt to Start ===
 echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
@@ -283,32 +327,6 @@ if [[ "$start_now" =~ ^[Yy]$ ]]; then
 
   echo "🚀 All containers are up and healthy!"
 fi
-
-# === Update WSL /etc/hosts ===
-if ! grep -q "$DOMAIN" /etc/hosts; then
-  echo "$HOST_ENTRY" | sudo tee -a /etc/hosts > /dev/null
-  echo "✅ Added $DOMAIN to WSL /etc/hosts"
-fi
-
-# === Patch Windows hosts file ===
-WIN_HOSTS_PWS="/mnt/c/Windows/Temp/add_hosts_entry.ps1"
-cat <<EOF > "$WIN_HOSTS_PWS"
-\$HostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
-\$Entry = "$HOST_ENTRY"
-\$wasReadOnly = \$false
-if ((Get-Item \$HostsPath).Attributes -band [System.IO.FileAttributes]::ReadOnly) {
-    attrib -R \$HostsPath
-    \$wasReadOnly = \$true
-}
-if ((Get-Content \$HostsPath) -notcontains \$Entry) {
-    Add-Content -Path \$HostsPath -Value \$Entry
-}
-if (\$wasReadOnly) {
-    attrib +R \$HostsPath
-}
-EOF
-powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File C:\\Windows\\Temp\\add_hosts_entry.ps1'" \
-  && echo "✅ Windows hosts file updated." || echo "⚠️ Please manually add: $HOST_ENTRY"
 
 # === GitHub Repo Creation ===
 echo "🌐 Creating GitHub repository..."
