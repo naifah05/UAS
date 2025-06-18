@@ -174,6 +174,7 @@ dcr() {
   docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
   docker exec "$CONTAINER" bash -c "find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete"
   docker exec "$CONTAINER" bash -c "rm -rf app/Filament/Admin/Resources/${NAME}*"
+  docker exec "$CONTAINER" bash -c "rm -f app/Policies/${NAME}Policy.php"
   echo "✅ Done Remove: $NAME"
 }
 unalias dcm 2>/dev/null
