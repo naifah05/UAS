@@ -305,7 +305,7 @@ powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-Ex
 echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
 read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
 if [[ "$start_now" =~ ^[Yy]$ ]]; then
-  cd "$ROOT_DIR" && docker-compose up -d --build
+  cd "$ROOT_DIR" && docker compose up -d --build
 
   echo "⏳ Waiting for containers to become healthy..."
 
