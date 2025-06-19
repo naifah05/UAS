@@ -112,7 +112,7 @@ dcr() {
   docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
   docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
   docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
-  docker exec "$CONTAINER" bash -c "find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete"
+  docker exec "$CONTAINER" bash -c "find database/migrations -type f -name 'create_${NAME_PLURAL}_table.php' -delete"
   docker exec "$CONTAINER" bash -c "rm -rf app/Filament/Admin/Resources/${NAME}*"
   echo "✅ Done Remove: $NAME"
 }
@@ -154,7 +154,7 @@ dcp() {
     return 1
   fi
   if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "⚠️ Warning: You have uncommitted changes."
+    echo "⚠ Warning: You have uncommitted changes."
   fi
   git add .
   git commit -m "$*"
@@ -163,7 +163,7 @@ dcp() {
 }
 unalias dcd 2>/dev/null
 dcd() {
-  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
+  PROJECT=$(docker ps --format "{{.Names}}" | grep php | cut -d"" -f1)
   if [ -n "$PROJECT" ]; then
     echo "🔻 Stopping containers for $PROJECT..."
     docker compose -p "$PROJECT" down
@@ -218,7 +218,7 @@ EOF
 
 cat <<EOF > "$ROOT_DIR/.gitignore"
 db/data/*
-*/db/data/*
+/db/data/
 ../db/data/*
 EOF
 
@@ -281,6 +281,8 @@ EOF
 # --- Hosts Entry ---
 grep -q "$DOMAIN" /etc/hosts || echo "127.0.0.1 $DOMAIN" | sudo tee -a /etc/hosts >/dev/null
 
+
+
 echo "✅ Project ready at https://${DOMAIN}"
 read -p "🚀 Start Docker Compose now? (y/n): " run_now
 if [[ "$run_now" =~ ^[Yy]$ ]]; then
@@ -289,25 +291,117 @@ if [[ "$run_now" =~ ^[Yy]$ ]]; then
   # --- Wait for Health ---
   echo "⏳ Waiting for containers to be healthy..."
   wait_for_health() {
+    # Dynamically determine the project name from a running container.
+    # This assumes container names follow the pattern <project_name>_<service_name>
+    local project_name=$(docker ps --format "{{.Names}}" --filter "label=com.docker.compose.project" | head -n 1 | cut -d'_' -f1)
+
+    if [ -z "$project_name" ]; then
+      echo "❌ Could not determine project name for health check. Ensure containers are starting."
+      exit 1
+    fi
+
     while true; do
-      running=$(docker-compose ps -q | xargs docker inspect -f '{{.State.Running}}' 2>/dev/null | grep true || true)
-      if [ -z "$running" ]; then
-        echo "❌ Containers stopped. Exiting..."
+      local all_healthy=true
+      # Get all container names associated with the detected project name
+      local containers=$(docker ps --filter "name=${project_name}_" --format "{{.Names}}")
+
+      if [ -z "$containers" ]; then
+        echo "❌ No containers found for project '$project_name'. Exiting..."
         exit 1
       fi
 
-      unhealthy=$(docker inspect --format='{{ .Name }} {{range .State.Health.Log}}{{.ExitCode}} {{end}}' $(docker-compose ps -q) 2>/dev/null | grep -v "0 0 0") || true
-      if [ -z "$unhealthy" ]; then
+      for container in $containers; do
+        local health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "not_set")
+        local running_status=$(docker inspect --format='{{.State.Running}}' "$container" 2>/dev/null || echo "false")
+
+        if [ "$running_status" != "true" ]; then
+          echo "❌ Container $container is not running. Exiting..."
+          exit 1
+        fi
+
+        if [ "$health_status" != "healthy" ]; then
+          all_healthy=false
+          break # Found an unhealthy container, no need to check others in this iteration
+        fi
+      done
+
+      if [ "$all_healthy" = "true" ]; then
         echo "✅ All containers are healthy!"
         echo "💻 Opening in VS Code..."
         code "$ROOT_DIR"
-        return
+        return # All healthy, exit the function
+      else
+        echo "⌛ Waiting for containers to be healthy..."
+        sleep 5
       fi
-
-      echo "⌛ Waiting for healthy containers..."
-      sleep 5
     done
   }
 
   wait_for_health
 fi
+
+# === GitHub Repo Creation ===
+echo "🌐 Creating GitHub repository..."
+if [ ! -f "$SCRIPT_DIR/.github-user" ]; then
+  read -p "👤 Enter your GitHub username: " GITHUB_USER
+  echo "$GITHUB_USER" > "$SCRIPT_DIR/.github-user"
+else
+  GITHUB_USER=$(<"$SCRIPT_DIR/.github-user")
+fi
+
+if [ ! -f "$SCRIPT_DIR/.github-token" ]; then
+  read -s -p "🔑 Enter your GitHub token: " GITHUB_TOKEN
+  echo
+  echo "$GITHUB_TOKEN" > "$SCRIPT_DIR/.github-token"
+else
+  GITHUB_TOKEN=$(<"$SCRIPT_DIR/.github-token")
+fi
+
+REPO_NAME="${PROJECT_NAME}-$(date +%Y)"
+API_URL="https://api.github.com/user/repos"
+REPO_PAYLOAD=$(cat <<EOF
+{
+  "name": "$REPO_NAME",
+  "private": false
+}
+EOF
+)
+
+RESPONSE=$(curl -s -w "\n%{http_code}" -u "$GITHUB_USER:$GITHUB_TOKEN" \
+  -X POST "$API_URL" \
+  -H "Accept: application/vnd.github+json" \
+  -d "$REPO_PAYLOAD")
+
+# --- Fix for "head: illegal line count -- -1" on macOS (BSD head) ---
+# Use sed to remove the last line (which is the HTTP status code added by curl -w)
+BODY=$(echo "$RESPONSE" | sed '$d')
+STATUS=$(echo "$RESPONSE" | tail -n 1) # Get only the last line (HTTP status code)
+# --- End Fix ---
+
+
+if [ "$STATUS" = "201" ]; then
+  echo "✅ GitHub repository '$REPO_NAME' created."
+  GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+elif [ "$STATUS" = "422" ]; then
+  echo "⚠ Repo exists or invalid. Proceeding..."
+  GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+else
+  echo "❌ GitHub API failed: $BODY"
+  GITHUB_SSH=""
+fi
+
+if [ -n "$GITHUB_SSH" ]; then
+  echo "🔧 Initializing Git..."
+  cd "$ROOT_DIR"
+  git init
+  git remote remove origin 2>/dev/null || true
+  git remote add origin "$GITHUB_SSH"
+  git add .
+  git commit -m "🔥 fresh from the oven"
+  git branch -M main
+  git push -u origin main && echo "✅ Project pushed to GitHub." || echo "⚠ Failed to push."
+fi
+
+# === Launch VS Code ===
+echo "🧠 Opening in VS Code..."
+code .
