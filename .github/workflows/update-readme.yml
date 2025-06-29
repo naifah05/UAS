@@ -15,10 +15,10 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Fetch GitHub stats and update README
+      - name: Fetch GitHub stats and update Readme.md
         run: |
           repo="${{ github.repository }}"
-          token="${{ secrets.GH_TOKEN }}"
+          token="${{ secrets.GH_TOKEN }}"  # ✅ use GH_TOKEN here
 
           # API requests
           CLONES=$(curl -s -H "Authorization: token $token" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$repo/traffic/clones)
@@ -33,7 +33,7 @@ jobs:
           STARS=$(echo "$META" | jq '.stargazers_count')
           FORKS=$(echo "$META" | jq '.forks_count')
 
-          # Update README
+          # Update Readme.md
           sed -i "s|<!--CLONE_COUNT-->.*|<!--CLONE_COUNT--> **Total Clones (14 days):** $CLONE_COUNT |" Readme.md
           sed -i "s|<!--UNIQUE_CLONE-->.*|<!--UNIQUE_CLONE--> **Unique Visitors (14 days):** $UNIQUE_CLONE |" Readme.md
           sed -i "s|<!--VIEW_COUNT-->.*|<!--VIEW_COUNT--> **Total Views (14 days):** $VIEW_COUNT |" Readme.md
@@ -41,10 +41,13 @@ jobs:
           sed -i "s|<!--STARS-->.*|<!--STARS--> **Stars:** $STARS |" Readme.md
           sed -i "s|<!--FORKS-->.*|<!--FORKS--> **Forks:** $FORKS |" Readme.md
 
-      - name: Commit & Push
+      - name: Commit & Push with GH_TOKEN
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ use your actual token
         run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
           git add Readme.md
-          git commit -m "Update README with latest stats" || echo "No changes"
-          git push
+          git commit -m "Update Readme.md with latest stats" || echo "No changes"
+          git push origin HEAD
