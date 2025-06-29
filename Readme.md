@@ -1,3 +1,6 @@
+# Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=djambred/boilerplate&type=Date)](https://www.star-history.com/#djambred/boilerplate&Date)
+
 # PERHATIAN HARAP DI BACA DENGAN CERMAT DAN TELITI
 # CONFIGURATION PROJECT
 ## CROSSCHECK REQUIREMENT
