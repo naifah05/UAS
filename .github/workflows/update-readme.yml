@@ -1,0 +1,50 @@
+name: Update README Stats
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Fetch GitHub stats and update README
+        run: |
+          repo="${{ github.repository }}"
+          token="${{ secrets.GH_TOKEN }}"
+
+          # API requests
+          CLONES=$(curl -s -H "Authorization: token $token" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$repo/traffic/clones)
+          VIEWS=$(curl -s -H "Authorization: token $token" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$repo/traffic/views)
+          META=$(curl -s -H "Authorization: token $token" https://api.github.com/repos/$repo)
+
+          # Parse data
+          CLONE_COUNT=$(echo "$CLONES" | jq '.count')
+          UNIQUE_CLONE=$(echo "$CLONES" | jq '.uniques')
+          VIEW_COUNT=$(echo "$VIEWS" | jq '.count')
+          UNIQUE_VIEW=$(echo "$VIEWS" | jq '.uniques')
+          STARS=$(echo "$META" | jq '.stargazers_count')
+          FORKS=$(echo "$META" | jq '.forks_count')
+
+          # Update README
+          sed -i "s|<!--CLONE_COUNT-->.*|<!--CLONE_COUNT--> **Total Clones (14 days):** $CLONE_COUNT |" README.md
+          sed -i "s|<!--UNIQUE_CLONE-->.*|<!--UNIQUE_CLONE--> **Unique Visitors (14 days):** $UNIQUE_CLONE |" README.md
+          sed -i "s|<!--VIEW_COUNT-->.*|<!--VIEW_COUNT--> **Total Views (14 days):** $VIEW_COUNT |" README.md
+          sed -i "s|<!--UNIQUE_VIEWS-->.*|<!--UNIQUE_VIEWS--> **Unique Viewers (14 days):** $UNIQUE_VIEW |" README.md
+          sed -i "s|<!--STARS-->.*|<!--STARS--> **Stars:** $STARS |" README.md
+          sed -i "s|<!--FORKS-->.*|<!--FORKS--> **Forks:** $FORKS |" README.md
+
+      - name: Commit & Push
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          git add README.md
+          git commit -m "Update README with latest stats" || echo "No changes"
+          git push
