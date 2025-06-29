@@ -34,12 +34,12 @@ jobs:
           FORKS=$(echo "$META" | jq '.forks_count')
 
           # Update README
-          sed -i "s|<!--CLONE_COUNT-->.*|<!--CLONE_COUNT--> **Total Clones (14 days):** $CLONE_COUNT |" README.md
-          sed -i "s|<!--UNIQUE_CLONE-->.*|<!--UNIQUE_CLONE--> **Unique Visitors (14 days):** $UNIQUE_CLONE |" README.md
-          sed -i "s|<!--VIEW_COUNT-->.*|<!--VIEW_COUNT--> **Total Views (14 days):** $VIEW_COUNT |" README.md
-          sed -i "s|<!--UNIQUE_VIEWS-->.*|<!--UNIQUE_VIEWS--> **Unique Viewers (14 days):** $UNIQUE_VIEW |" README.md
-          sed -i "s|<!--STARS-->.*|<!--STARS--> **Stars:** $STARS |" README.md
-          sed -i "s|<!--FORKS-->.*|<!--FORKS--> **Forks:** $FORKS |" README.md
+          sed -i "s|<!--CLONE_COUNT-->.*|<!--CLONE_COUNT--> **Total Clones (14 days):** $CLONE_COUNT |" Readme.md
+          sed -i "s|<!--UNIQUE_CLONE-->.*|<!--UNIQUE_CLONE--> **Unique Visitors (14 days):** $UNIQUE_CLONE |" Readme.md
+          sed -i "s|<!--VIEW_COUNT-->.*|<!--VIEW_COUNT--> **Total Views (14 days):** $VIEW_COUNT |" Readme.md
+          sed -i "s|<!--UNIQUE_VIEWS-->.*|<!--UNIQUE_VIEWS--> **Unique Viewers (14 days):** $UNIQUE_VIEW |" Readme.md
+          sed -i "s|<!--STARS-->.*|<!--STARS--> **Stars:** $STARS |" Readme.md
+          sed -i "s|<!--FORKS-->.*|<!--FORKS--> **Forks:** $FORKS |" Readme.md
 
       - name: Commit & Push
         run: |
