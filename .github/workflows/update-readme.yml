@@ -49,10 +49,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "djambred"
-          git config user.email "djambred@gmail.com"
+          git config user.email "djambred@users.noreply.github.com"
+
+          # ⚠️ Update remote to use token authentication
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
 
           git add README.md
           git commit -m "🔄 Update GitHub stats in README" || echo "No changes"
-
-          # ✅ Use token-based push
-          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }} HEAD:main
+          git push origin HEAD
