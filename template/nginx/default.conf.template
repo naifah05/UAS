@@ -10,6 +10,7 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    server_tokens off;
 
     server_name {{DOMAIN}};
     root /var/www/html/public;
