@@ -10,7 +10,7 @@ whoami
 apt install jq -y
 ```
 
-HASIL :
+HASIL DIWSL :
 ❯ whoami
 root
 
