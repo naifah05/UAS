@@ -1,0 +1,38 @@
+name: Manual Merge to main
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Branch to merge into main (e.g., dev, staging)'
+        required: true
+        default: 'dev'
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch all branches
+        run: git fetch origin
+
+      - name: Checkout main branch
+        run: git checkout main
+
+      - name: Merge selected branch into main
+        run: |
+          echo "Merging branch: ${{ github.event.inputs.source_branch }}"
+          git merge origin/${{ github.event.inputs.source_branch }} -m "Manual merge ${{ github.event.inputs.source_branch }} into main"
+
+      - name: Push changes to main
+        run: git push origin main
