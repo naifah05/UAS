@@ -1,0 +1,46 @@
+name: Auto PR into dev with auto-merge
+
+on:
+  push:
+    branches-ignore:
+      - dev  # avoid infinite loop
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-and-merge-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current branch name
+        id: get_branch
+        run: echo "branch_name=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request from dynamic branch to dev
+        id: cpr
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: dev
+          head: ${{ steps.get_branch.outputs.branch_name }}
+          title: "🔁 Sync: ${{ steps.get_branch.outputs.branch_name }} → dev"
+          body: |
+            This PR auto-syncs `${{ steps.get_branch.outputs.branch_name }}` → `dev`
+          draft: false
+          delete-branch: false
+
+      - name: Auto-merge the PR
+        if: steps.cpr.outputs.pull-request-number != ''
+        uses: pascalgn/automerge-action@v0.16.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MERGE_LABELS: ""
+          MERGE_METHOD: merge
+          MERGE_COMMIT_MESSAGE: pull-request-title
