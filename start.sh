@@ -39,15 +39,22 @@ CERT_SOURCE_KEY="./${PROJECT_NAME}-key.pem"
 CERT_DEST_CRT="$NGINX_SSL/${DOMAIN}.crt"
 CERT_DEST_KEY="$NGINX_SSL/${DOMAIN}.key"
 
-if [[ ! -f "$CERT_SOURCE_CRT" || ! -f "$CERT_SOURCE_KEY" ]]; then
+# Check if certificates already exist
+if [[ -f "$CERT_DEST_CRT" && -f "$CERT_DEST_KEY" ]]; then
+  echo "🔒 Certificates for $DOMAIN already exist. Skipping certificate generation."
+else
+  # If certificates do not exist, generate new ones
   echo "🔐 Generating SSL certs for $DOMAIN..."
   powershell.exe -Command "mkcert -cert-file ${PROJECT_NAME}.pem -key-file ${PROJECT_NAME}-key.pem ${DOMAIN}"
   sleep 2
-fi
 
-cp "$CERT_SOURCE_CRT" "$CERT_DEST_CRT"
-cp "$CERT_SOURCE_KEY" "$CERT_DEST_KEY"
-rm -f "$CERT_SOURCE_CRT" "$CERT_SOURCE_KEY"
+  # Move the generated certificates to the correct directory
+  cp "$CERT_SOURCE_CRT" "$CERT_DEST_CRT"
+  cp "$CERT_SOURCE_KEY" "$CERT_DEST_KEY"
+
+  # Clean up the original generated certs
+  rm -f "$CERT_SOURCE_CRT" "$CERT_SOURCE_KEY"
+fi
 
 # === Generate docker-entrypoint.sh ===
 sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
@@ -266,6 +273,46 @@ gclone() {
   fi
 }
 alias gc=gclone
+unalias gd 2>/dev/null
+gdelete() {
+  local repo_name=$1
+  local user_file="/root/boilerplate/.github-user"
+  local token_file="/root/boilerplate/.github-token"
+
+  if [[ -z "$repo_name" ]]; then
+    echo "❌ Usage: gdelete <repo-name>"
+    return 1
+  fi
+
+  if [[ ! -f "$user_file" || ! -f "$token_file" ]]; then
+    echo "❌ Username or token file not found."
+    return 1
+  fi
+
+  local username=$(<"$user_file")
+  local token=$(<"$token_file")
+
+  read "confirm?❗ Are you sure you want to delete the GitHub repo '${username}/${repo_name}'? [y/N]: "
+  if [[ "$confirm" =~ ^[yY]$ ]]; then
+    echo "🗑 Deleting repo '${username}/${repo_name}'..."
+
+    local response=$(curl -s -o /dev/null -w "%{http_code}" \
+      -X DELETE \
+      -H "Authorization: token $token" \
+  https://api.github.com/repos/${username}/${repo_name})
+
+    if [[ "$response" == "204" ]]; then
+      echo "✅ Repository '${repo_name}' has been deleted."
+    elif [[ "$response" == "404" ]]; then
+      echo "❌ Repository not found or permission denied."
+    else
+      echo "❌ Failed to delete. HTTP Status: $response"
+    fi
+  else
+    echo "❎ Deletion cancelled."
+  fi
+}
+alias gd=gdelete
 unalias dcu 2>/dev/null
 alias dcu='docker compose up -d'
 unalias dci 2>/dev/null
@@ -285,19 +332,29 @@ fi
 WIN_HOSTS_PWS="/mnt/c/Windows/Temp/add_hosts_entry.ps1"
 cat <<EOF > "$WIN_HOSTS_PWS"
 \$HostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
-\$Entry = "$HOST_ENTRY"
+\$Entry = "$HOST_ENTRY"  # This should properly pass the HOST_ENTRY variable from bash
 \$wasReadOnly = \$false
-if ((Get-Item \$HostsPath).Attributes -band [System.IO.FileAttributes]::ReadOnly) {
-    attrib -R \$HostsPath
-    \$wasReadOnly = \$true
-}
+
+# Check if the entry already exists
 if ((Get-Content \$HostsPath) -notcontains \$Entry) {
+    # If the entry doesn't exist, add it
+    if ((Get-Item \$HostsPath).Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+        attrib -R \$HostsPath
+        \$wasReadOnly = \$true
+    }
     Add-Content -Path \$HostsPath -Value \$Entry
+    Write-Host "✅ Added \$Entry to hosts file."
+} else {
+    Write-Host "ℹ️ \$Entry already exists in the hosts file."
 }
+
+# Restore the read-only attribute if it was set
 if (\$wasReadOnly) {
     attrib +R \$HostsPath
 }
 EOF
+
+# Run the PowerShell script with elevated privileges
 powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File C:\\Windows\\Temp\\add_hosts_entry.ps1'" \
   && echo "✅ Windows hosts file updated." || echo "⚠️ Please manually add: $HOST_ENTRY"
 
