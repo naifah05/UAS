@@ -1,118 +1,176 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_NAME="$1"
-if [ -z "$PROJECT_NAME" ]; then
-  echo "❌ Please provide a project name: ./start.sh myproject"
+# --- Fungsi Bantuan untuk Pencatatan Log ---
+log_info() { echo "ℹ️  $1"; }
+log_success() { echo "✅ $1"; }
+log_warning() { echo "⚠️  $1"; }
+log_error() {
+  echo "❌ $1" >&2
   exit 1
-fi
+}
 
-# === Setup Paths ===
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="/root/perkuliahan/$PROJECT_NAME"
-TEMPLATE_DIR="./template"
-DB_DIR="$ROOT_DIR/db/conf.d"
-NGINX_DIR="$ROOT_DIR/nginx"
-NGINX_SSL="$NGINX_DIR/ssl"
-PHP_DIR="$ROOT_DIR/php"
-SRC_DIR="$ROOT_DIR/src"
-DOMAIN="${PROJECT_NAME}.test"
-ENV_FILE="$ROOT_DIR/.env"
-GITIGNORE_FILE="$ROOT_DIR/.gitignore"
-HOST_ENTRY="127.0.0.1 $DOMAIN"
-ZSHRC_FILE="$HOME/.zshrc"
+# --- Fungsi Utama ---
+main() {
+  # Validasi awal
+  if [ -z "${1:-}" ]; then
+    log_error "Harap berikan nama proyek. Contoh: ./start.sh proyek-saya"
+  fi
 
-echo "📁 Creating folder structure for '$PROJECT_NAME'..."
-mkdir -p "$DB_DIR" "$NGINX_SSL" "$PHP_DIR" "$SRC_DIR"
+  # Inisialisasi variabel proyek
+  local PROJECT_NAME="$1"
+  local SCRIPT_DIR
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local ROOT_DIR="/root/perkuliahan/$PROJECT_NAME"
+  local TEMPLATE_DIR="$SCRIPT_DIR/template"
+  local DOMAIN="${PROJECT_NAME}.test"
+  local HOST_ENTRY="127.0.0.1 $DOMAIN"
 
-# === Copy template files ===
-cp "$TEMPLATE_DIR/db/my.cnf" "$DB_DIR/"
-cp "$TEMPLATE_DIR/nginx/Dockerfile" "$NGINX_DIR/"
-cp "$TEMPLATE_DIR/php/Dockerfile" "$PHP_DIR/"
-cp "$TEMPLATE_DIR/php/www.conf" "$PHP_DIR/"
-cp "$TEMPLATE_DIR/php/local.ini" "$PHP_DIR/"
-cp -a "$TEMPLATE_DIR/src/." "$SRC_DIR/"
+  # Jalankan alur kerja
+  check_dependencies
+  setup_directories "$ROOT_DIR"
+  copy_template_files "$ROOT_DIR" "$TEMPLATE_DIR"
+  generate_ssl_certs "$ROOT_DIR" "$DOMAIN"
+  render_configs "$ROOT_DIR" "$PROJECT_NAME" "$DOMAIN"
+  generate_docker_compose "$ROOT_DIR"
+  update_zshrc "$HOME/.zshrc"
+  update_hosts_file "$HOST_ENTRY" "$DOMAIN"
 
-# === Generate certificates ===
-CERT_SOURCE_CRT="./${PROJECT_NAME}.pem"
-CERT_SOURCE_KEY="./${PROJECT_NAME}-key.pem"
-CERT_DEST_CRT="$NGINX_SSL/${DOMAIN}.crt"
-CERT_DEST_KEY="$NGINX_SSL/${DOMAIN}.key"
+  # Pindah ke direktori proyek
+  cd "$ROOT_DIR"
 
-# Check if certificates already exist
-if [[ -f "$CERT_DEST_CRT" && -f "$CERT_DEST_KEY" ]]; then
-  echo "🔒 Certificates for $DOMAIN already exist. Skipping certificate generation."
-else
-  # If certificates do not exist, generate new ones
-  echo "🔐 Generating SSL certs for $DOMAIN..."
-  powershell.exe -Command "mkcert -cert-file ${PROJECT_NAME}.pem -key-file ${PROJECT_NAME}-key.pem ${DOMAIN}"
-  sleep 2
+  # Langkah akhir
+  start_containers
+  create_github_repo "$SCRIPT_DIR" "$PROJECT_NAME"
+  final_steps "$ROOT_DIR" "$PROJECT_NAME"
+}
 
-  # Move the generated certificates to the correct directory
-  cp "$CERT_SOURCE_CRT" "$CERT_DEST_CRT"
-  cp "$CERT_SOURCE_KEY" "$CERT_DEST_KEY"
+# --- Fungsi-fungsi Pembantu ---
 
-  # Clean up the original generated certs
-  rm -f "$CERT_SOURCE_CRT" "$CERT_SOURCE_KEY"
-fi
+check_dependencies() {
+    log_info "Memeriksa dependensi..."
+    for cmd in git docker mkcert code nc; do
+        if ! command -v "$cmd" &>/dev/null; then
+            log_error "Perintah '$cmd' tidak ditemukan. Harap install terlebih dahulu."
+        fi
+    done
+    if ! docker compose version &>/dev/null; then
+        log_error "Perintah 'docker compose' tidak berfungsi. Pastikan Docker Anda mendukung Compose v2."
+    fi
+}
 
-# === Generate docker-entrypoint.sh ===
-sed -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
-    -e "s|{{DOMAIN}}|$DOMAIN|g" \
-    "$TEMPLATE_DIR/php/docker-entrypoint.sh.template" > "$PHP_DIR/docker-entrypoint.sh"
-chmod +x "$PHP_DIR/docker-entrypoint.sh"
+setup_directories() {
+  local ROOT_DIR="$1"
+  log_info "Membuat struktur folder di $ROOT_DIR..."
+  mkdir -p "$ROOT_DIR/db/conf.d" "$ROOT_DIR/nginx/ssl" "$ROOT_DIR/php" "$ROOT_DIR/src"
+  # Buat .gitkeep agar direktori src tidak kosong, sesuai logika entrypoint
+  touch "$ROOT_DIR/src/.gitkeep"
+}
 
-# === Render nginx config ===
-sed -e "s|{{DOMAIN}}|$DOMAIN|g" \
-    -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
-    "$TEMPLATE_DIR/nginx/default.conf.template" > "$NGINX_DIR/default.conf"
+copy_template_files() {
+  local ROOT_DIR="$1"
+  local TEMPLATE_DIR="$2"
+  log_info "Menyalin file template..."
+  if [ ! -d "$TEMPLATE_DIR" ]; then
+    log_error "Direktori template '$TEMPLATE_DIR' tidak ditemukan."
+  fi
+  # Salin semua template kecuali entrypoint
+  cp "$TEMPLATE_DIR/db/my.cnf" "$ROOT_DIR/db/conf.d/"
+  cp "$TEMPLATE_DIR/nginx/Dockerfile" "$ROOT_DIR/nginx/"
+  cp "$TEMPLATE_DIR/php/Dockerfile" "$ROOT_DIR/php/"
+  cp "$TEMPLATE_DIR/php/www.conf" "$ROOT_DIR/php/"
+  cp "$TEMPLATE_DIR/php/local.ini" "$ROOT_DIR/php/"
+  # Salin seluruh template aplikasi Laravel Anda dari src
+  log_info "Menyalin template aplikasi dari template/src/..."
+  if [ -z "$(ls -A "$TEMPLATE_DIR/src/")" ]; then log_error "Direktori 'template/src' kosong!"; fi
+  cp -a "$TEMPLATE_DIR/src/." "$ROOT_DIR/src/"
 
-# === Generate Compose .env ===
-cat <<EOF > "$ENV_FILE"
+  # Salin skrip entrypoint Anda dan berikan izin eksekusi
+  if [ ! -f "$TEMPLATE_DIR/php/docker-entrypoint.sh.template" ]; then
+      log_error "File 'template/php/docker-entrypoint.sh.template' tidak ditemukan!"
+  fi
+  cp "$TEMPLATE_DIR/php/docker-entrypoint.sh.template" "$ROOT_DIR/php/docker-entrypoint.sh"
+  chmod +x "$ROOT_DIR/php/docker-entrypoint.sh"
+}
+
+generate_ssl_certs() {
+  local ROOT_DIR="$1"
+  local DOMAIN="$2"
+  local NGINX_SSL="$ROOT_DIR/nginx/ssl"
+  local CERT_PATH="$NGINX_SSL/$DOMAIN.crt"
+  local KEY_PATH="$NGINX_SSL/$DOMAIN.key"
+
+  if [[ -f "$CERT_PATH" && -f "$KEY_PATH" ]]; then
+    log_info "Sertifikat untuk $DOMAIN sudah ada. Melewati."
+    return
+  fi
+
+  log_info "Membuat sertifikat SSL untuk $DOMAIN..."
+  if [ ! -d "$(mkcert -CAROOT)" ]; then
+    log_info "Local CA tidak ditemukan, menjalankan 'mkcert -install'..."
+    mkcert -install
+  fi
+  mkcert -cert-file "$CERT_PATH" -key-file "$KEY_PATH" "$DOMAIN" "localhost" "127.0.0.1"
+  log_success "Sertifikat SSL berhasil dibuat."
+}
+
+render_configs() {
+  local ROOT_DIR="$1"
+  local PROJECT_NAME="$2"
+  local DOMAIN="$3"
+
+  log_info "Menghasilkan file-file konfigurasi..."
+  # Nginx Config
+  sed -e "s|{{DOMAIN}}|$DOMAIN|g" "$TEMPLATE_DIR/nginx/default.conf.template" >"$ROOT_DIR/nginx/default.conf"
+
+  # .env file untuk Docker Compose di host
+  cat <<EOF >"$ROOT_DIR/.env"
+# Variabel ini digunakan oleh docker-compose.yml
 COMPOSE_PROJECT_NAME=${PROJECT_NAME}
-REPOSITORY_NAME=${PROJECT_NAME}
-IMAGE_TAG=latest
-COMPOSE_BAKE=true
-APP_NAME="${PROJECT_NAME}"
-APP_URL="https://${DOMAIN}"
-ASSET_URL="https://${DOMAIN}"
+PROJECT_NAME=${PROJECT_NAME}
 EOF
 
-# === .gitignore ===
-cat <<EOF > "$GITIGNORE_FILE"
-db/data/*
-*/db/data/*
-../db/data/*
+  # .gitignore
+  cat <<EOF >"$ROOT_DIR/.gitignore"
+# Docker data
+db/data/
+# Dependencies
+src/vendor/
+src/node_modules/
+# IDE & OS files
+.idea/
+.vscode/
+.DS_Store
+# Environment files
+.env
+src/.env
 EOF
+}
 
-# === docker-compose.yml ===
-cat <<EOF > "$ROOT_DIR/docker-compose.yml"
+generate_docker_compose() {
+  local ROOT_DIR="$1"
+
+  log_info "Membuat file docker-compose.yml..."
+  cat <<EOF >"$ROOT_DIR/docker-compose.yml"
+version: '3.8'
 services:
   php:
     build:
       context: ./php
-    container_name: ${PROJECT_NAME}_php
-    healthcheck:
-      test: ["CMD-SHELL", "php artisan --version"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
+    container_name: \${COMPOSE_PROJECT_NAME}_php
+    # Teruskan variabel PROJECT_NAME ke dalam kontainer
+    environment:
+      - PROJECT_NAME=\${PROJECT_NAME}
+      - XDEBUG=\${XDEBUG:-false}
     volumes:
       - ./src:/var/www/html
-    environment:
-      - PROJECT_NAME=${PROJECT_NAME}
     depends_on:
-      - db
-
+      db:
+        condition: service_healthy
   nginx:
     build:
       context: ./nginx
-    container_name: ${PROJECT_NAME}_nginx
-    healthcheck:
-      test: ["CMD-SHELL", "curl -k -fsSL https://${DOMAIN} || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
+    container_name: \${COMPOSE_PROJECT_NAME}_nginx
     ports:
       - "443:443"
       - "80:80"
@@ -122,10 +180,10 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - php
-
   db:
     image: mariadb:10.11
-    container_name: ${PROJECT_NAME}_db
+    container_name: \${COMPOSE_PROJECT_NAME}_db
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -134,328 +192,133 @@ services:
     ports:
       - "13306:3306"
     environment:
-      MYSQL_DATABASE: $PROJECT_NAME
+      # Database ini akan dibuat saat kontainer pertama kali dijalankan
+      MYSQL_DATABASE: \${PROJECT_NAME}
       MYSQL_ROOT_PASSWORD: p455w0rd
     volumes:
       - ./db/conf.d:/etc/mysql/conf.d
       - ./db/data:/var/lib/mysql
 EOF
-
-echo "✅ docker-compose.yml created."
-
-# === Cleaning up Docker ===
-CLEANUP_FLAG="$SCRIPT_DIR/.docker_cleanup_done"
-if [ ! -f "$CLEANUP_FLAG" ]; then
-  echo "🧹 Running initial docker-cleanup.sh..."
-  zsh "$SCRIPT_DIR/docker-cleanup.sh" && touch "$CLEANUP_FLAG" && echo "✅ Cleanup completed." || echo "⚠️ docker-cleanup.sh failed."
-else
-  echo "ℹ️ Cleanup already run, skipping."
-fi
-
-# === Add Aliases/Functions to .zshrc ===
-echo "🔗 Updating functions and aliases in $ZSHRC_FILE..."
-sed -i '/# === START ===/,/# === END ===/d' "$ZSHRC_FILE"
-
-cat <<'EOF' >> "$ZSHRC_FILE"
-# === START ===
-unalias dcr 2>/dev/null
-dcr() {
-  local NAME="$1"
-  if [ -z "$NAME" ]; then
-    echo "❌ Usage: dcr <ModelName>"
-    return 1
-  fi
-
-  local CONTAINER=$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
-  if [ -z "$CONTAINER" ]; then
-    echo "❌ No PHP container found."
-    return 1
-  fi
-
-  local NAME_SNAKE=$(echo "$NAME" | sed -E 's/([a-z])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
-  local NAME_PLURAL="${NAME_SNAKE}s"
-
-  echo "🗑 Removing $NAME files from container: $CONTAINER"
-  docker exec "$CONTAINER" bash -c "rm -f app/Models/$NAME.php"
-  docker exec "$CONTAINER" bash -c "rm -f app/Http/Controllers/${NAME}Controller.php"
-  docker exec "$CONTAINER" bash -c "rm -f database/seeders/${NAME}Seeder.php"
-  docker exec "$CONTAINER" bash -c "find database/migrations -type f -name '*create_${NAME_PLURAL}_table*.php' -delete"
-  docker exec "$CONTAINER" bash -c "rm -rf app/Filament/Admin/Resources/${NAME}*"
-  docker exec "$CONTAINER" bash -c "rm -f app/Policies/${NAME}Policy.php"
-  echo "✅ Done Remove: $NAME"
+  log_success "File docker-compose.yml berhasil dibuat."
 }
-unalias dcm 2>/dev/null
-dcm() {
-  if [ -z "$1" ]; then
-    echo "❌ Usage: dcm <ModelName>"
-    return 1
-  fi
-  local CONTAINER=$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
-  if [ -z "$CONTAINER" ]; then
-    echo "❌ PHP container not found."
-    return 1
-  fi
-  local NAME="$1"
-  docker exec -it "$CONTAINER" art make:model "$NAME" -msc
-  docker exec -it "$CONTAINER" art make:filament-resource "$NAME" --generate
-  echo "✅ $NAME scaffolded with Filament."
-}
-unalias dcv 2>/dev/null
-dcv() {
-  if [ -z "$1" ]; then
-    echo "❌ Usage: dcm <ModelName>"
-    return 1
-  fi
-  local CONTAINER=$(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1)
-  if [ -z "$CONTAINER" ]; then
-    echo "❌ PHP container not found."
-    return 1
-  fi
-  local NAME="$1"
-  docker exec -it "$CONTAINER" art make:filament-resource "$NAME" --generate
-  echo "✅ $NAME resource with Filament."
-}
-unalias dcp 2>/dev/null
-dcp() {
-  if [ $# -eq 0 ]; then
-    echo "❌ Usage: dcp your commit message"
-    return 1
-  fi
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "⚠️ Warning: You have uncommitted changes."
-  fi
-  git add .
-  git commit -m "$*"
-  git push -u origin main
-  echo "✅ Changes pushed to origin/main."
-}
-unalias dcd 2>/dev/null
-dcd() {
-  PROJECT=$(docker ps --format "{{.Names}}" | grep _php | cut -d"_" -f1)
-  if [ -n "$PROJECT" ]; then
-    echo "🔻 Stopping containers for $PROJECT..."
-    docker compose -p "$PROJECT" down
-  else
-    echo "❌ Could not detect project name."
-  fi
-}
-unalias pip 2>/dev/null
-pip() {
-  if [[ "$1" == "install" ]]; then
-    command pip install --break-system-packages "${@:2}"
-  else
-    command pip "$@"
-  fi
-}
-unalias pip3 2>/dev/null
-pip3() {
-  if [[ "$1" == "install" ]]; then
-    command pip3 install --break-system-packages "${@:2}"
-  else
-    command pip3 "$@"
-  fi
-}
-unalias start 2>/dev/null
-alias start='cd /root/boilerplate && ./start.sh'
-unalias gc 2>/dev/null
-gclone() {
-  local user=$1
-  local repo=$2
-  local ssh_url="git@github.com:${user}/${repo}.git"
-  local https_url="https://github.com/${user}/${repo}.git"
 
-  echo "🛠️ Trying SSH clone: $ssh_url"
-  if git clone "$ssh_url"; then
-    echo "✅ Cloned via SSH"
-  else
-    echo "⚠️ SSH failed, falling back to HTTPS..."
-    git clone "$https_url" && echo "✅ Cloned via HTTPS"
+update_hosts_file() {
+  local HOST_ENTRY="$1"
+  local DOMAIN="$2"
+
+  log_info "Memeriksa file hosts..."
+  if ! grep -q "$HOST_ENTRY" /etc/hosts; then
+    log_info "Menambahkan $DOMAIN ke /etc/hosts WSL (membutuhkan sudo)..."
+    echo "$HOST_ENTRY" | sudo tee -a /etc/hosts >/dev/null
   fi
-}
-alias gc=gclone
-unalias gd 2>/dev/null
-gdelete() {
-  local repo_name=$1
-  local user_file="/root/boilerplate/.github-user"
-  local token_file="/root/boilerplate/.github-token"
-
-  if [[ -z "$repo_name" ]]; then
-    echo "❌ Usage: gdelete <repo-name>"
-    return 1
+  local win_hosts_path="/mnt/c/Windows/System32/drivers/etc/hosts"
+  if grep -q "$HOST_ENTRY" "$win_hosts_path" &>/dev/null; then
+    log_success "$DOMAIN sudah ada di file hosts Windows."
+    return
   fi
-
-  if [[ ! -f "$user_file" || ! -f "$token_file" ]]; then
-    echo "❌ Username or token file not found."
-    return 1
-  fi
-
-  local username=$(<"$user_file")
-  local token=$(<"$token_file")
-
-  read "confirm?❗ Are you sure you want to delete the GitHub repo '${username}/${repo_name}'? [y/N]: "
-  if [[ "$confirm" =~ ^[yY]$ ]]; then
-    echo "🗑 Deleting repo '${username}/${repo_name}'..."
-
-    local response=$(curl -s -o /dev/null -w "%{http_code}" \
-      -X DELETE \
-      -H "Authorization: token $token" \
-  https://api.github.com/repos/${username}/${repo_name})
-
-    if [[ "$response" == "204" ]]; then
-      echo "✅ Repository '${repo_name}' has been deleted."
-    elif [[ "$response" == "404" ]]; then
-      echo "❌ Repository not found or permission denied."
-    else
-      echo "❌ Failed to delete. HTTP Status: $response"
-    fi
-  else
-    echo "❎ Deletion cancelled."
-  fi
-}
-alias gd=gdelete
-unalias dcu 2>/dev/null
-alias dcu='docker compose up -d'
-unalias dci 2>/dev/null
-alias dci='docker exec -it $(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art project:init'
-unalias dca 2>/dev/null
-alias dca='docker exec -it $(docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1) art'
-# === END ===
+  log_info "Mencoba memperbarui file hosts Windows..."
+  log_warning "⚠️  PERHATIKAN DESKTOP ANDA! Pop-up UAC akan muncul meminta izin Administrator."
+  local ps_script_path_win="C:\\Windows\\Temp\\update_hosts.ps1"
+  local ps_script_path_wsl="/mnt/c/Windows/Temp/update_hosts.ps1"
+  cat <<EOF > "$ps_script_path_wsl"
+\$HostFile = "C:\\Windows\\System32\\drivers\\etc\\hosts"
+\$Entry = "$HOST_ENTRY"
+if (!(Select-String -Path \$HostFile -Pattern \$Entry -Quiet)) { Add-Content -Path \$HostFile -Value \$Entry }
 EOF
-
-# === Update WSL /etc/hosts ===
-if ! grep -q "$DOMAIN" /etc/hosts; then
-  echo "$HOST_ENTRY" | sudo tee -a /etc/hosts > /dev/null
-  echo "✅ Added $DOMAIN to WSL /etc/hosts"
-fi
-
-# === Patch Windows hosts file ===
-WIN_HOSTS_PWS="/mnt/c/Windows/Temp/add_hosts_entry.ps1"
-cat <<EOF > "$WIN_HOSTS_PWS"
-\$HostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
-\$Entry = "$HOST_ENTRY"  # This should properly pass the HOST_ENTRY variable from bash
-\$wasReadOnly = \$false
-
-# Check if the entry already exists
-if ((Get-Content \$HostsPath) -notcontains \$Entry) {
-    # If the entry doesn't exist, add it
-    if ((Get-Item \$HostsPath).Attributes -band [System.IO.FileAttributes]::ReadOnly) {
-        attrib -R \$HostsPath
-        \$wasReadOnly = \$true
-    }
-    Add-Content -Path \$HostsPath -Value \$Entry
-    Write-Host "✅ Added \$Entry to hosts file."
-} else {
-    Write-Host "ℹ️ \$Entry already exists in the hosts file."
+  powershell.exe -Command "Start-Process powershell.exe -ArgumentList '-ExecutionPolicy Bypass -File \"$ps_script_path_win\"' -Verb RunAs"
+  sleep 3
+  if grep -q "$HOST_ENTRY" "$win_hosts_path" &>/dev/null; then
+    log_success "File hosts Windows berhasil diperbarui."
+  else
+    log_warning "Gagal memperbarui file hosts Windows. Lakukan secara manual."
+  fi
 }
 
-# Restore the read-only attribute if it was set
-if (\$wasReadOnly) {
-    attrib +R \$HostsPath
+start_containers() {
+  read -p "🚀 Mulai proyek dengan Docker Compose sekarang? (y/n): " start_now
+  if [[ "$start_now" =~ ^[Yy]$ ]]; then
+    log_info "Membangun dan menjalankan kontainer..."
+    docker compose up -d --build
+    log_success "Kontainer sedang berjalan di latar belakang. Anda bisa melihat log dengan 'docker compose logs -f'"
+  fi
 }
-EOF
 
-# Run the PowerShell script with elevated privileges
-powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy Bypass -File C:\\Windows\\Temp\\add_hosts_entry.ps1'" \
-  && echo "✅ Windows hosts file updated." || echo "⚠️ Please manually add: $HOST_ENTRY"
-
-# === Prompt to Start ===
-echo "✅ Project '$PROJECT_NAME' ready at https://$DOMAIN"
-read -p "🚀 Start project with Docker Compose now? (y/n): " start_now
-if [[ "$start_now" =~ ^[Yy]$ ]]; then
-  cd "$ROOT_DIR" && docker compose up -d --build
-
-  echo "⏳ Waiting for containers to become healthy..."
-
-  # Wait for all expected containers
-  containers=("php" "nginx" "db")
-  for service in "${containers[@]}"; do
-    container_name="${PROJECT_NAME}_${service}"
-
-    echo "🔍 Waiting for $container_name..."
-    while true; do
-      status=$(docker inspect -f '{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "starting")
-      if [[ "$status" == "healthy" || "$status" == "running" ]]; then
-        echo "✅ $container_name is $status."
-        break
-      else
-        sleep 1
-      fi
-    done
-  done
-
-  echo "🚀 All containers are up and healthy!"
-fi
-
-# === GitHub Repo Creation ===
-echo "🌐 Creating GitHub repository..."
-if [ ! -f "$SCRIPT_DIR/.github-user" ]; then
-  read -p "👤 Enter your GitHub username: " GITHUB_USER
-  echo "$GITHUB_USER" > "$SCRIPT_DIR/.github-user"
-else
-  GITHUB_USER=$(<"$SCRIPT_DIR/.github-user")
-fi
-
-if [ ! -f "$SCRIPT_DIR/.github-token" ]; then
-  read -s -p "🔑 Enter your GitHub token: " GITHUB_TOKEN
-  echo
-  echo "$GITHUB_TOKEN" > "$SCRIPT_DIR/.github-token"
-else
-  GITHUB_TOKEN=$(<"$SCRIPT_DIR/.github-token")
-fi
-
-REPO_NAME="${PROJECT_NAME}-$(date +%Y)"
-API_URL="https://api.github.com/user/repos"
-REPO_PAYLOAD=$(cat <<EOF
-{
-  "name": "$REPO_NAME",
-  "private": false
-}
-EOF
-)
-
-RESPONSE=$(curl -s -w "\n%{http_code}" -u "$GITHUB_USER:$GITHUB_TOKEN" \
-  -X POST "$API_URL" \
-  -H "Accept: application/vnd.github+json" \
-  -d "$REPO_PAYLOAD")
-BODY=$(echo "$RESPONSE" | head -n -1)
-STATUS=$(echo "$RESPONSE" | tail -n1)
-
-if [ "$STATUS" = "201" ]; then
-  echo "✅ GitHub repository '$REPO_NAME' created."
-  GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
-elif [ "$STATUS" = "422" ]; then
-  echo "⚠️ Repo exists or invalid. Proceeding..."
-  GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
-else
-  echo "❌ GitHub API failed: $BODY"
-  GITHUB_SSH=""
-fi
-
-if [ -n "$GITHUB_SSH" ]; then
-  echo "🔧 Initializing Git..."
-  cd "$ROOT_DIR"
+create_github_repo() {
+  local SCRIPT_DIR="$1"
+  local PROJECT_NAME="$2"
+  read -p "🌐 Buat repositori GitHub untuk proyek ini? (y/n): " create_repo
+  if [[ ! "$create_repo" =~ ^[Yy]$ ]]; then
+    return
+  fi
+  local GITHUB_USER
+  if [ -f "$SCRIPT_DIR/.github-user" ]; then
+    GITHUB_USER=$(<"$SCRIPT_DIR/.github-user")
+  else
+    read -p "👤 Masukkan username GitHub Anda: " GITHUB_USER
+    echo "$GITHUB_USER" >"$SCRIPT_DIR/.github-user"
+  fi
+  local GITHUB_TOKEN
+  if [ -f "$SCRIPT_DIR/.github-token" ]; then
+    GITHUB_TOKEN=$(<"$SCRIPT_DIR/.github-token")
+  else
+    read -s -p "🔑 Masukkan GitHub Personal Access Token Anda: " GITHUB_TOKEN
+    echo
+    echo "$GITHUB_TOKEN" >"$SCRIPT_DIR/.github-token"
+  fi
+  local REPO_NAME="${PROJECT_NAME}-$(date +%Y)"
+  log_info "Mencoba membuat repositori GitHub: $GITHUB_USER/$REPO_NAME"
+  local RESPONSE
+  RESPONSE=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.v3+json" -d "{\"name\":\"$REPO_NAME\", \"private\":false}" "https://api.github.com/user/repos")
+  local BODY
+  BODY=$(echo "$RESPONSE" | sed '$d')
+  local STATUS
+  STATUS=$(echo "$RESPONSE" | tail -n1)
+  local GITHUB_SSH="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+  if [ "$STATUS" = "201" ]; then
+    log_success "Repositori GitHub '$REPO_NAME' berhasil dibuat."
+  elif [ "$STATUS" = "422" ]; then
+    log_warning "Repositori '$REPO_NAME' sudah ada. Melanjutkan..."
+  else
+    log_error "Gagal membuat repositori. Status: $STATUS. Pesan: $BODY"
+    return
+  fi
+  log_info "Inisialisasi Git dan push awal..."
   git init
-  git remote remove origin 2>/dev/null || true
-  git remote add origin "$GITHUB_SSH"
-  git add .
-  git commit -m "🔥 fresh from the oven"
   git branch -M main
-  git push -u origin main && echo "✅ Project pushed to GitHub." || echo "⚠️ Failed to push."
-fi
+  git add .
+  git commit -m "🎉 Initial commit"
+  git remote add origin "$GITHUB_SSH"
+  git push -u origin main
+  log_success "Proyek berhasil di-push ke GitHub."
+}
 
-# === Launch VS Code ===
-echo "🧠 Opening in VS Code..."
-code .
+update_zshrc() {
+  local ZSHRC_FILE="$1"
+  log_info "Memperbarui fungsi dan alias di $ZSHRC_FILE..."
+  sed -i.bak '/# === BOILERPLATE START ===/,/# === BOILERPLATE END ===/d' "$ZSHRC_FILE"
+  cat <<'EOF' >>"$ZSHRC_FILE"
+# === BOILERPLATE START ===
+_get_php_container_name() { docker ps --filter "name=_php" --format "{{.Names}}" | head -n 1; }
+dcr() { [ -z "$1" ] && { echo "❌ Usage: dcr <ModelName>"; return 1; }; local C=$(_get_php_container_name); [ -z "$C" ] && { echo "❌ Kontainer PHP tidak ditemukan."; return 1; }; local N="$1"; local NS=$(echo "$N" | sed -E 's/([a-z])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]'); local NP="${NS}s"; echo "🗑 Menghapus file untuk '$N'..."; docker exec "$C" rm -f "app/Models/$N.php" "app/Http/Controllers/${N}Controller.php" "database/seeders/${N}Seeder.php" "app/Policies/${N}Policy.php"; docker exec "$C" find database/migrations -type f -name "*create_${NP}_table.php" -delete; docker exec "$C" rm -rf "app/Filament/Admin/Resources/${N}Resource.php"; }
+dcm() { [ -z "$1" ] && { echo "❌ Usage: dcm <ModelName>"; return 1; }; local C=$(_get_php_container_name); [ -z "$C" ] && { echo "❌ Kontainer PHP tidak ditemukan."; return 1; }; docker exec -it "$C" php artisan make:model "$1" -msc; docker exec -it "$C" php artisan make:filament-resource "$1" --generate; }
+dcp() { [ $# -eq 0 ] && { echo "❌ Usage: dcp <commit message>"; return 1; }; git add . && git commit -m "$*" && git push; }
+dcd() { local P=$(docker ps --format "{{.Names}}" | grep _php | head -n 1 | cut -d'_' -f1); [ -n "$P" ] && docker compose -p "$P" down || echo "❌ Tidak dapat mendeteksi proyek."; }
+alias dcu='docker compose up -d'
+alias dca='docker exec -it $(_get_php_container_name) php artisan'
+# === BOILERPLATE END ===
+EOF
+}
 
-# === Reload ZSH if inside ZSH ===
-if [ "${ZSH_VERSION:-}" ]; then
-  echo "🔄 Reloading $ZSHRC_FILE..."
-  source "$ZSHRC_FILE"
-else
-  echo "🔁 Switching to Zsh..."
-  echo "🎉 All done! Project '$PROJECT_NAME' is ready at $ROOT_DIR"
-  echo "🚀 You can now start developing your project!"
+final_steps() {
+  local ROOT_DIR="$1"
+  local PROJECT_NAME="$2"
+  log_info "Membuka proyek di VS Code..."
+  code "$ROOT_DIR"
+  log_success "🎉 Semua selesai! Proyek '$PROJECT_NAME' siap dikembangkan."
+  log_info "Direktori proyek: $ROOT_DIR"
+  log_info "Memuat ulang shell Zsh untuk menerapkan alias baru..."
   exec zsh
-fi
+}
 
-# === End of Script ===
+# --- Jalankan Skrip ---
+main "$@"
